@@ -41,6 +41,7 @@ import pandas as pd
 import seaborn as sns
 from scipy.stats import entropy
 import matplotlib.pyplot as plt
+from typing import Optional, Any, Tuple, List, Iterable, Dict, Union
 import numpy as np
 from enum import Enum
 from sklearn.metrics import PrecisionRecallDisplay, ConfusionMatrixDisplay
@@ -373,11 +374,6 @@ def quickSummary(data,
 
     return widgets.interactive(output, x=combobox)
 
-
-
-
-
-
 def fullTest(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True):
     print(f'''
     Test:
@@ -407,11 +403,7 @@ def fullTest(test, testPredictions, train=None, trainPredictions=None, accuracy=
         PrecisionRecallDisplay.from_predictions(train, trainPredictions)
     plt.show()
 
-
-
-
-
-def normalize(df, method='default'):
+def _normalize(df, method='default'):
     for col in quantatative(df):
         if method == 'default':
             df[col] = (df[col]-df[col].mean())/df[col].std()
@@ -420,19 +412,9 @@ def normalize(df, method='default'):
             df[col] = (df[col]-df[col].min())/(df[col].max()-df[col].min())
         else:
             raise TypeError('Invalid method parameter')
-_normalize = normalize
-
-from typing import Optional, Any, Tuple, List, Iterable, Dict, Union
-
-
-
-from Cope import debug
-
-# TODO: add an option to handle unknowns by randomly insterting random values
-# And another option to insert random values biased by how they are distributed in the data
 
 def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
-    debug(f'_cleanColumn called with {column}')
+    # debug(f'_cleanColumn called with {column}')
     log = lambda s: print(s) if verbose else None
     missing = np.nan
     if column in df.columns:
@@ -549,7 +531,6 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
     else:
         raise TypeError(f"Column {column} provided is not in the given DataFrame")
 
-
 def clean(df:pd.DataFrame,
         # target               :str,
         config               :Dict[str, Dict[str, Any]],
@@ -621,186 +602,3 @@ def clean(df:pd.DataFrame,
             display(args)
             _cleanColumn(df, args, column, verbose)
         return df
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-
-
-
-
-
-
-
-    # Age
-    if 'age' in df.columns:
-        if AGE_BINNING_METHOD == 'frequency':
-            df.age = pd.qcut(df.age, AGE_BIN_AMT)
-        elif AGE_BINNING_METHOD == 'width':
-            todo("age width binnig")
-        elif AGE_BINNING_METHOD == 'custom':
-            df.age = pd.cut(df['age'], [17, 25, 40, 60, 75, 200])
-        else:
-            todo('normalize age')
-    # Job
-    if 'job' in df.columns:
-        if REMOVE_JOB_STUDENT:
-            df.job = df.job[df.job != 'student']
-        if REMOVE_JOB_UNEMPLOYED:
-            df.job = df.job[df.job != 'unemployed']
-    # Marital
-    if 'marital' in df.columns:
-        if REMOVE_MARITAL_UNKNOWN:
-            df.marital = df.marital[df.marital != 'unknown']
-    # Education
-    if 'education' in df.columns:
-        if QUANTIFY_EDUCATION:
-            df.education = df.education.map({
-                'basic.4y': 4,
-                'high.school': 9,
-                'basic.6y': 6,
-                'basic.9y': 9,
-                'professional.course': 10,
-                'unknown': 9, # assume they at least passed highschool
-                'university.degree': 12,
-                'illiterate': 0,
-            })
-    # Default
-    if 'default' in df.columns:
-        if REMOVE_DEFAULTED:
-            df.default = df.default[df.default != 'yes']
-
-        if DEFUALT_UNKNOWN_METHOD == 'remove':
-            df.default = df.default[df.default != 'unknown']
-        elif DEFUALT_UNKNOWN_METHOD == 'yes':
-            df.default.loc[df.default == 'unknown'] = 'yes'
-        elif DEFUALT_UNKNOWN_METHOD == 'mode':
-            df.default.loc[df.default == 'unknown'] = df.default.mode()[0]
-    # Housing
-    if 'housing' in df.columns:
-        if HOUSING_UNKNOWN_METHOD == 'remove':
-            df.housing = df.housing[df.housing != 'unknown']
-        elif HOUSING_UNKNOWN_METHOD == 'mode':
-            df.housing.loc[df.housing == 'unknown'] = df.housing.mode()[0]
-    # Loan
-    if 'loan' in df.columns:
-        if LOAN_UNKNOWN_METHOD == 'remove':
-            df.loan = df.loan[df.loan != 'unknown']
-        if LOAN_UNKNOWN_METHOD == 'mode':
-            df.housing.loc[df.loan == 'unknown'] = df.loan.mode()[0]
-    # pdays
-    if 'pdays' in df.columns:
-        without = data.pdays[data.pdays != 999]
-        if PDAYS_999_METHOD == 'remove':
-            df.pdays = without
-        if PDAYS_999_METHOD == 'average':
-            df.pdays.loc[df.pdays == 999] = without.mean()
-        if PDAYS_999_METHOD == '0':
-            df.pdays.loc[df.pdays == 999] = 0
-        if PDAYS_999_METHOD == 'Add was_contacted column':
-            df['was_contacted'] = df.pdays[df.pdays != 999]
-            df.was_contacted.loc[df.was_contacted.isnull()] = 0
-            df.was_contacted.loc[df.was_contacted != 0.] = 1
-            df.pdays.drop(columns='pdays')
-            # display(df.was_contacted.unique())
-
-    # Normalize the quantative columns to within a certain range
-    if NORMALIZE:
-        print('normalizing...')
-        _normalize(df, method=NORMALIZE_METHOD)
-
-    # Convert Catagorical data to unique integers
-    print('converting y column to 1s and 0s...')
-    if 'y' in df.columns:
-        df.y = df.y.map({'yes': 1, 'no': 0})
-
-    if NUMERIC_CONVERSION == 'assign':
-        # CONVERT Y COLUMN FIRST
-        # We have to have the yes's = 1 and the no's = 0, otherwise we're training the model backwards
-        assignments = {}
-        for c in catagorical(df):
-            # print(f'converting catagorical column {c} to numerical...')
-            df[c], assignments[c] = pd.factorize(df[c])
-    elif NUMERIC_CONVERSION == 'oneHotEncode':
-        df = pd.get_dummies(df)
-
-    # Split the target column from the rest of the data if we have it
-    if 'y' in df.columns:
-        # This is just here so we dont drop duplicates of the holdout set
-        if DROP_DUPLICATES:
-            df.drop_duplicates(inplace=True)
-
-        X, y = df.drop(columns='y'), df['y']
-
-        # Resample the data only if we have the answers
-        if RESAMPLING == 'oversample':
-            sampler = RandomOverSampler(random_state=RESAMPLE_SEED)
-            X, y = sampler.fit_resample(X, y)
-        elif RESAMPLING == 'undersample':
-            sampler = RandomUnderSampler(random_state=RESAMPLE_SEED)
-            X, y = sampler.fit_resample(X, y)
-        elif RESAMPLING == 'both':
-            todo('figure out how to mix under and over sampling')
-
-        return X, y
-
-    # otherwise, we're just dfing the holdout set
-    else:
-        return df
-
- """
-
-#@title Cleaning Configs {display-mode: "form"}
-#@markdown Cleaning Configuration
-
-# CONVERT_TO_NUMERIC = True #@param ["True", "False"] {type:"raw"}
-# NORMALIZE = True #@param ["True", "False"] {type:"raw"}
-# NORMALIZE_METHOD = 'min-max' #@param ["default", "min-max"]
-# ADD_WAS_CONTACTED_COLUMN = True #@param ["True", "False"] {type:"raw"}
-# DROP_DUPLICATES = True #@param ["True", "False"] {type:"raw"}
-AGE_BINNING_METHOD = 'frequency' #@param ['frequency', 'width', 'custom']
-AGE_BIN_AMT = 5 #@param {type:"integer"}
-REMOVE_JOB_STUDENT = True #@param ["True", "False"] {type:"raw"}
-REMOVE_JOB_UNEMPLOYED = True #@param ["True", "False"] {type:"raw"}
-REMOVE_MARITAL_UNKNOWN = False #@param ["True", "False"] {type:"raw"}
-QUANTIFY_EDUCATION = True #@param ["True", "False"] {type:"raw"}
-REMOVE_DEFAULTED = False #@param ["True", "False"] {type:"raw"}
-# If you don't know, assume the worst
-NUMERIC_CONVERSION = 'assign' #@param ['oneHotEncode', 'assign']
-DEFUALT_UNKNOWN_METHOD = 'yes' #  @param ['remove', 'yes', 'mode']
-HOUSING_UNKNOWN_METHOD = 'mode' # @param ['remove', 'mode']
-LOAN_UNKNOWN_METHOD    = 'mode' # @param ['remove', 'mode']
-PDAYS_999_METHOD = 'Add was_contacted column' # @param ['remove', 'average', '0', 'Add was_contacted column']
-RESAMPLING = 'oversample' #@param ['oversample', 'undersample', 'both', 'neither']
-# ONE_HOT_ENCODE = True #@param ["True", "False"] {type:"raw"}
-SPLIT_SEED = 12345 #@param {type:"integer"}
-RESAMPLE_SEED = 54321 #@param {type:"integer"}
-REMOVE_COLUMNS = ['contact', 'nr.employed'] #@param
-CLASS_WEIGHT_PARAM = "balanced" #@param {type:"raw"}

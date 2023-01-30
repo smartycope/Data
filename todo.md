@@ -9,8 +9,10 @@
 - Fix all the commended out parts
 - Convert all the print statements to be graph titles instead
 - In summary, add info on the amounts of unique values of the target (for resampling)
-- Fix it (it's currently broken) 
+- Fix it (it's currently broken)
 
 
 # Clean
 - make a query option in clean function
+- add an option to handle unknowns by randomly insterting random values
+    - And another option to insert random values biased by how they are distributed in the data
