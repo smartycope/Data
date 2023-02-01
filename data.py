@@ -696,14 +696,16 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         warn(f'The normalize option was set on {column}, which is not quantatative, skipping.')
                         continue
                 else:
-                    match options:
-                        case True | 'min-max':
-                            log(f'Normalizing "{column}" by min-max method')
-                            df[column] = (df[column]-df[column].min())/(df[column].max()-df[column].min())
-                        case 'range':
-                            log(f'Normalizing "{column}" by range method')
-                            raise NotImplementedError(f'range normalization doesn\'t work yet')
-                            df[column] = (df[column]-df[column].mean())/df[column].std()
+                    # match options:
+                    if options == True or options == 'min-max':
+                        log(f'Normalizing "{column}" by min-max method')
+                        df[column] = (df[column]-df[column].min())/(df[column].max()-df[column].min())
+                    elif options == 'range':
+                        log(f'Normalizing "{column}" by range method')
+                        raise NotImplementedError(f'range normalization doesn\'t work yet')
+                        df[column] = (df[column]-df[column].mean())/df[column].std()
+                    else:
+                        raise TypeError('Invalid normalize argument given')
             if op == 'convert_numeric':
                 if isQuantatative(df[column]):
                     if not ignoreWarnings:
