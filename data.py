@@ -319,9 +319,10 @@ def quickSummary(data,
                 for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in cat])).items():
                     # If it has too high of a cardinality, just print the first few
                     card = len(value)
+                    shortened = False
                     if card > 30:
+                        shortened = True
                         value = value[:29]
-                        value.append(f'... ({card - 29} more catagories)')
 
                     print(key + ":")
                     joined_list = ", ".join(value)
@@ -330,6 +331,7 @@ def quickSummary(data,
                     else:
                         for item in value:
                             print('   ' + item)
+                    print(f'... ({card - 29} more catagories)')
         elif page == 'Stats':
                 if len(quant):
                     # print('Summary of Quantatative Values:')
@@ -441,9 +443,16 @@ def quickSummary(data,
         elif page == 'Custom Plots':
                 featureABox.layout.visibility = 'visible'
                 featureBBox.layout.visibility = 'visible'
-                todo('display the correlation right here')
 
-                sns.scatterplot(x=data[a], y=data[b])
+                graph = sns.scatterplot(x=data[a], y=data[b])
+                if isQuantatative(data[a]) and isQuantatative(data[b]):
+                    graph.set(title=f'Correlation: {data.corr()[a][b]}')
+                else:
+                    # counts = data.groupby(a)[b].value_counts()
+                    # print(counts.index.max())
+                    # print(counts)
+                    graph.set(title=f'Most common together: Todo')
+
                 plt.show()
         elif page == 'Matrix':
                 if len(quant):
@@ -497,7 +506,12 @@ def quickSummary(data,
                 print('Invalid start option')
 
     # widgets.interact(output, page=combobox, feature=featureBox)
-    ui = widgets.GridBox([combobox, featureBox, featureABox, featureBBox])
+    ui = widgets.GridBox([combobox, featureABox, featureBox, featureBBox], layout=widgets.Layout(
+                grid_template_columns='auto auto',
+                grid_row_gap='10px',
+                grid_column_gap='100px',
+            )
+       )
     out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox})
     display(ui, out)
 
