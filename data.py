@@ -257,6 +257,7 @@ def quickSummary(data,
                 'Counts',
                 'Correlations',
                 'General Plots',
+                'Custom Plots',
                 'Matrix',
                 'Alerts',
             ],
@@ -277,16 +278,29 @@ def quickSummary(data,
                     description='Feature',
                 )
     featureBox.layout.visibility = 'hidden'
-
+    featureABox = widgets.Dropdown(
+        options=list(data.columns),
+                    value=target,
+                    description='x',
+        )
+    featureABox.layout.visibility = 'hidden'
+    featureBBox = widgets.Dropdown(
+        options=list(data.columns),
+                    value=target,
+                    description='y',
+        )
+    featureBBox.layout.visibility = 'hidden'
 
     # All the actual logic
-    def output(page, feature):
+    def output(page, feature, a, b):
         # See baffled comment above
         corr, missing = whatTheHeck
         featureBox.layout.visibility = 'hidden'
+        featureABox.layout.visibility = 'hidden'
+        featureBBox.layout.visibility = 'hidden'
 
-        match page:
-            case 'Description':
+        # match page:
+        if page == 'Description':
                 print(f'There are {len(data)} samples, with {len(data.columns)} columns:')
                 display(getNiceTypesTable(data))
 
@@ -302,11 +316,11 @@ def quickSummary(data,
                     else:
                         for item in value:
                             print('   ' + item)
-            case 'Stats':
+        elif page == 'Stats':
                 if len(quant):
                     # print('Summary of Quantatative Values:')
                     display(_relevant.agg(dict(zip(quant, [stats]*len(relevant)))))
-            case 'Entropy':
+        elif page == 'Entropy':
                 todo('Calculate entropy relative to the target feature')
                 # if target is not None:
                 # base = e if entropy is not None else entropy
@@ -315,11 +329,11 @@ def quickSummary(data,
                     # print(f'The entropy of {c} is: {entropy(data[c], data[target])}')
                 # else:
                     # print('Target feature must be provided in order to calculate the entropy')
-            case 'Duplicates':
+        elif page == 'Duplicates':
                 todo()
-            case 'Head':
+        elif page == 'Head':
                 display(data.head())
-            case 'Counts':
+        elif page == 'Counts':
                 # This is sorted just so the features with less unique options go first
                 for i in sorted(cat, key=lambda c: len(data[c].unique())):
                     print(f'{i} value counts:')
@@ -328,7 +342,7 @@ def quickSummary(data,
                         print('\tEvery sample has a unique catagory')
                     else:
                         print(pretty_counts(data[i]))
-            case 'Correlations':
+        elif page == 'Correlations':
                 if len(quant):
                     print('Correlations Between Quantatative Values:')
                     if type(corr) is bool:
@@ -345,7 +359,7 @@ def quickSummary(data,
                                 print(f'\t{a:<{a_len}} <-> {b:<{b_len}}: {round(c, 2):+}')
                         else:
                             print(f'\tThere are no correlations greater than {corr:.0%}')
-            case 'Missing':
+        elif page == 'Missing':
                 if len(_relevant):
                     print('Missing Percentages:')
                     if type(missing) is bool:
@@ -362,7 +376,7 @@ def quickSummary(data,
                             print(f'\tAll values are missing less than {missing:.0%} of their entries')
                     else:
                         raise TypeError('Missing is a bad type')
-            case 'Features':
+        elif page == 'Features':
                 # TODO: mode[s], std, quantative entropy, catagorical correlations, data.groupby(feature)[target].value_counts(),
                 featureBox.layout.visibility = 'visible'
 
@@ -401,7 +415,7 @@ def quickSummary(data,
                     print(f'It has an average value of {data[feature].mean():.2f}, and a median of {data[feature].median():.2f}.')
                     print(f'It has a minimum value of {data[feature].min():.2f}, and a maximum value of {data[feature].max():.2f}.')
                     print(correlations)
-            case 'General Plots':
+        elif page == 'General Plots':
                 if len(quant):
                     print('Plot of Quantatative Values:')
                     sns.catplot(data=quant)
@@ -410,7 +424,14 @@ def quickSummary(data,
                     print('Plot of Catagorical Value Counts:')
                     todo('catagorical (count?) plots')
                     # plt.show()
-            case 'Matrix':
+        elif page == 'Custom Plots':
+                featureABox.layout.visibility = 'visible'
+                featureBBox.layout.visibility = 'visible'
+                todo('display the correlation right here')
+
+                sns.scatterplot(x=data[a], y=data[b])
+                plt.show()
+        elif page == 'Matrix':
                 if len(quant):
                     print('Something Something Matrix:')
                     if target in quantatative(data, relevant):
@@ -418,7 +439,7 @@ def quickSummary(data,
                     else:
                         sns.pairplot(data=quant)
                     plt.show()
-            case 'Alerts':
+        elif page == 'Alerts':
                 # TODO:
                 # Check that entropy isn't too low
                 # check that relative entropy isn't too low
@@ -458,10 +479,13 @@ def quickSummary(data,
                     if lower -  lowerMid > OUTLIER_THRESHOLD * data[q].median():
                         print(f'Feature {q:>{max_name_len}} may have some lower outliers', end='   | ')
                         print(f'lower: {lower:>6.1f} | lowerMid: {lowerMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {lower-lowerMid:>6.1f}')
-            case _:
+        else:
                 print('Invalid start option')
 
-    widgets.interact(output, page=combobox, feature=featureBox)
+    # widgets.interact(output, page=combobox, feature=featureBox)
+    ui = widgets.GridBox([combobox, featureBox, featureABox, featureBBox])
+    out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox})
+    display(ui, out)
 
 def suggestedCleaning(df, target):
     todo('suggestedCleaning')
@@ -495,16 +519,16 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                 missing = options
             if op == 'handle_missing':
                 without = df.loc[df[column] != missing]
-                match options:
-                    case True:
+                # match options:
+                if options == True:
                         if not ignoreWarnings:
                             raise TypeError(f"Please specify a value or method for the handle_missing option")
-                    case False:
+                elif options == False:
                         pass
-                    case 'remove':
+                elif options == 'remove':
                         log(f'Removing all samples with a "{column}" values of "{missing}"')
                         df = without
-                    case 'mean':
+                elif options == 'mean':
                         if isCatagorical(df[column]):
                             if not ignoreWarnings:
                                 raise TypeError(f"Cannot get mean of a catagorical feature")
@@ -513,7 +537,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         mean = without[column].mean()
                         log(f'Setting all samples with a "{column}" value of "{missing}" to the mean ({mean:.2})')
                         df.loc[df[column] == missing, column] = mean
-                    case 'median':
+                elif options == 'median':
                         if isCatagorical(df[column]):
                             if not ignoreWarnings:
                                 raise TypeError(f"Cannot get median of a catagorical feature")
@@ -522,7 +546,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         median = without[column].median()
                         log(f'Setting all samples with a "{column}" value of "{missing}" to the median ({median})')
                         df.loc[df[column] == missing, column] = median
-                    case 'mode':
+                elif options == 'mode':
                         # I'm not sure how else to pick a mode, so just pick one at random
                         if MODE_SELECTION == 'random':
                             mode = random.choice(without[column].mode())
@@ -532,7 +556,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                             mode = without[column].mode()[-1]
                         log(f'Setting all samples with a "{column}" value of "{missing}" to a mode ({mode})')
                         df.loc[df[column] == missing, column] = mode
-                    case 'random':
+                elif options == 'random':
                         if isCatagorical(df[column]):
                             log(f'Setting all samples with a "{column}" value of "{missing}" to random catagories')
                             def fill(sample):
@@ -549,7 +573,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                                     return sample
 
                         df[column] = df[column].apply(fill)
-                    case 'balanced_random':
+                elif options == 'balanced_random':
                         if isCatagorical(df[column]):
                             log(f'Setting all samples with a "{column}" value of "{missing}" to evenly distributed random catagories')
                             def fill(sample):
@@ -565,7 +589,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                                 else:
                                     return sample
                         df[column] = df[column].apply(fill)
-                    case _:
+                else:
                         log(f'Setting all samples with a "{column}" value of "{missing}" to {options}')
                         df.loc[df[column] == missing, column] = options
             if op == 'queries':
@@ -581,11 +605,11 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                             options = [options]
 
                         for query, replacement in options:
-                            match replacement:
-                                case 'remove':
+                            # match replacement:
+                            if replacement == 'remove':
                                     log(f'Removing all samples where "{query}" is true')
                                     df = df.drop(df.query(query).index)
-                                case 'mean':
+                            elif replacement == 'mean':
                                     if isCatagorical(df[column]):
                                         if not ignoreWarnings:
                                             raise TypeError(f"Cannot get mean of a catagorical feature")
@@ -594,7 +618,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                                     mean = df[column].mean()
                                     log(f'Setting all samples where {query} is true to the mean of "{column}" ({mean:.2})')
                                     df.loc[df.query(query).index, column] = mean
-                                case 'median':
+                            elif replacement == 'median':
                                     if isCatagorical(df[column]):
                                         if not ignoreWarnings:
                                             raise TypeError(f"Cannot get median of a catagorical feature")
@@ -603,7 +627,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                                     median = df[column].median()
                                     log(f'Setting all samples where "{query}" is true to the median of "{column}" ({median})')
                                     df.loc[df.query(query).index, column] = median
-                                case 'mode':
+                            elif replacement == 'mode':
                                     # I'm not sure how else to pick a mode, so just pick one at random
                                     if MODE_SELECTION == 'random':
                                         mode = random.choice(df[column].mode())
@@ -613,7 +637,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                                         mode = df[column].mode()[-1]
                                     log(f'Setting all samples where "{query}" is true to a mode of "{column}" ({mode})')
                                     df.loc[df.query(query).index, column] = mode
-                                case 'random':
+                            elif replacement == 'random':
                                     if isCatagorical(df[column]):
                                         log(f'Setting all samples where "{query}" is true to have random catagories')
                                         def fill(sample):
@@ -625,7 +649,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
 
                                     q = df.query(query)
                                     df.loc[q.index, column] = q[column].apply(fill)
-                                case 'balanced_random':
+                            elif replacement == 'balanced_random':
                                     if isCatagorical(df[column]):
                                         log(f'Setting all samples where "{query}" is true to have evenly distributed random catagories')
                                         def fill(sample):
@@ -637,7 +661,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
 
                                     q = df.query(query)
                                     df.loc[q.index, column] = q[column].apply(fill)
-                                case _:
+                            else:
                                     log(f'Setting all samples where "{query}" is true to have a "{column}" value of  {options}')
                                     df.loc[df.query(query).index, column] = replacement
                     except ValueError:
@@ -651,19 +675,21 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         warn(f'The bin option was set on "{column}", which is not quantatative, skipping.')
                         continue
                 else:
-                    match options:
-                        case True:
+                    # match options:
+                    if options == True:
                             if not ignoreWarnings:
                                 raise TypeError(f"Please specify a method for the bin option")
-                        case ('frequency', int()):
+                    elif options[0] == 'frequency':
                             log(f'Binning "{column}" by frequency into {options[1]} bins')
                             df[column] = pd.qcut(df[column], options[1], duplicates='drop')
-                        case ('width', int()):
+                    elif options[0] == 'width':
                             log(f'Binning "{column}" by width into {options[1]} bins')
                             raise NotImplementedError('Width binning')
-                        case tuple() | list():
+                    elif isinstance(options, (tuple, list)):
                             log(f'Custom binning "{column}" into {len(options)} bins')
                             df[column] = pd.cut(df[column], options)
+                    else:
+                        raise TypeError(f"Bin option given bad arguement")
             if op == 'normalize':
                 if isCatagorical(df[column]):
                     if not ignoreWarnings:
@@ -684,13 +710,15 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         warn(f'The conver_numeric option was set on {column}, which is not catagorical, skipping.')
                         continue
                 else:
-                    match options:
-                        case True | 'assign':
-                            log(f'Converting "{column}" to quantatative by assinging to arbitrary values')
-                            df[column], _ = pd.factorize(df[column])
-                        case 'one_hot_encode':
-                            log(f'Converting "{column}" to quantatative by one hot encoding')
-                            df = pd.get_dummies(df, columns=[column])
+                    # match options:
+                    if options == True or options == 'assign':
+                        log(f'Converting "{column}" to quantatative by assinging to arbitrary values')
+                        df[column], _ = pd.factorize(df[column])
+                    elif options == 'one_hot_encode':
+                        log(f'Converting "{column}" to quantatative by one hot encoding')
+                        df = pd.get_dummies(df, columns=[column])
+                    else:
+                        raise TypeError(f"Bad arguement given to convert_numeric")
             if op == 'add_column':
                 name, selection = options
                 log(f'Adding new column "{name}"')
@@ -784,15 +812,17 @@ def clean(df:pd.DataFrame,
     return df
 
 def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversample', seed=None):
-    match method:
-        case 'oversample':
-            sampler = RandomOverSampler(random_state=seed)
-            X, y = sampler.fit_resample(X, y)
-        case 'undersample':
-            sampler = RandomUnderSampler(random_state=seed)
-            X, y = sampler.fit_resample(X, y)
-        case 'mixed':
-            todo('figure out how to mix under and over sampling')
+    # match method:
+    if method == 'oversample':
+        sampler = RandomOverSampler(random_state=seed)
+        X, y = sampler.fit_resample(X, y)
+    elif method == 'undersample':
+        sampler = RandomUnderSampler(random_state=seed)
+        X, y = sampler.fit_resample(X, y)
+    elif method == 'mixed':
+        todo('figure out how to mix under and over sampling')
+    else:
+        raise TypeError(f"Invalid method arguement given")
     return X, y
 
 def ensemble(modelFunc, amt):
@@ -809,9 +839,9 @@ def fullTest(test, testPredictions, train=None, trainPredictions=None, accuracy=
         print(f'\tAccuracy:  {sk.metrics.accuracy_score(test,  testPredictions):.{accuracy}}')
         explain('Accuracy is a measure of how well the model did on average')
         print(f'\tPrecision: {sk.metrics.precision_score(test, testPredictions):.{accuracy}}')
-        explain('Precision is a measure of how many samples we accurately predicted?')
+        explain('Precision is a measure of how many things we said were true and we were wrong')
         print(f'\tRecall:    {sk.metrics.recall_score(test,    testPredictions):.{accuracy}}')
-        explain('Recall is a measure of how many times we accurately predicted a specific condition')
+        explain('Recall is a measure of how many things we missed out on')
         if confusion:
             ConfusionMatrixDisplay.from_predictions(test, testPredictions, cmap='Blues')
         if curve:
