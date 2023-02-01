@@ -182,7 +182,12 @@ def column_entropy(column:pd.Series, base=e):
     vc = pd.Series(column).value_counts(normalize=True, sort=False)
     return -(vc * np.log(vc)/np.log(base)).sum()
 
-def pretty_2_column_array(a, ):
+def pretty_2_column_array(a, limit=30):
+    card = len(a)
+    if card > limit:
+        a = a[:limit-1]
+        a.append(f'... ({card - limit - 1} more)')
+
     offset = max(list(a.index), key=len)
     rtn = ''
     for i in range(len(a)):
@@ -307,8 +312,14 @@ def quickSummary(data,
                 print()
 
                 print('The possible values for the Catagorical values:')
-                # This is jsut a complicated way to print them all nicely
+                # This is just an overly complicated way to print them all nicely
                 for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in cat])).items():
+                    # If it has too high of a cardinality, just print the first few
+                    card = len(value)
+                    if card > 30:
+                        value = value[:29]
+                        value.append(f'... ({card - 29} more catagories)')
+
                     print(key + ":")
                     joined_list = ", ".join(value)
                     if len(joined_list) <= 80: # adjust this number as needed
@@ -481,6 +492,9 @@ def quickSummary(data,
                         print(f'lower: {lower:>6.1f} | lowerMid: {lowerMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {lower-lowerMid:>6.1f}')
         else:
                 print('Invalid start option')
+
+        # Clear the output (because colab doesn't automatically or something?)
+        print('\n' * 100)
 
     # widgets.interact(output, page=combobox, feature=featureBox)
     ui = widgets.GridBox([combobox, featureBox, featureABox, featureBBox])
