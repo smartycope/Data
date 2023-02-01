@@ -14,6 +14,7 @@ import ipywidgets as widgets
 from typing import Union, Callable, Iterable
 from collections import OrderedDict
 from sympy import Integer, Float
+from IPython.display import clear_output, display
 from math import log, e
 
 # If there's mutliple modes, how do we want to choose one? Used in _cleanColumn
@@ -186,7 +187,7 @@ def pretty_2_column_array(a, limit=30):
     card = len(a)
     if card > limit:
         a = a[:limit-1]
-        a.append(f'... ({card - limit - 1} more)')
+        # a.append(f'... ({card - limit - 1} more)')
 
     offset = max(list(a.index), key=len)
     rtn = ''
@@ -303,6 +304,8 @@ def quickSummary(data,
         featureBox.layout.visibility = 'hidden'
         featureABox.layout.visibility = 'hidden'
         featureBBox.layout.visibility = 'hidden'
+        # Clear the output (because colab doesn't automatically or something?)
+        clear_output(wait=True)
 
         # match page:
         if page == 'Description':
@@ -492,9 +495,6 @@ def quickSummary(data,
                         print(f'lower: {lower:>6.1f} | lowerMid: {lowerMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {lower-lowerMid:>6.1f}')
         else:
                 print('Invalid start option')
-
-        # Clear the output (because colab doesn't automatically or something?)
-        print('\n' * 100)
 
     # widgets.interact(output, page=combobox, feature=featureBox)
     ui = widgets.GridBox([combobox, featureBox, featureABox, featureBBox])
