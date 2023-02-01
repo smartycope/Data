@@ -20,6 +20,14 @@ from math import log, e
 # options: 'random', 'first', 'last'
 MODE_SELECTION = 'random'
 
+# How small is a "small" dataset
+SMALL_DATASET = 1000
+HIGH_CARDINALITY = 50
+# At what percentage does it become worrisome if that many samples are missing the feature?
+ALERT_MISSING = .55
+# If the difference between the extreme and the mid extreme > median * this, then it indicates outliers
+OUTLIER_THRESHOLD = .5
+
 # np.object_ is a string type (apparently)
 _catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')))
 
@@ -250,6 +258,7 @@ def quickSummary(data,
                 'Correlations',
                 'General Plots',
                 'Matrix',
+                'Alerts',
             ],
             value=start,
             description='Select Summary',
@@ -260,6 +269,8 @@ def quickSummary(data,
     # This doesn't work
     # combobox.box_style = 'primary'
 
+    # To make this work, this is always there, we just set it to hidden when not
+    # under the features page
     featureBox = widgets.Dropdown(
                     options=list(data.columns),
                     value=target,
@@ -355,19 +366,21 @@ def quickSummary(data,
                 # TODO: mode[s], std, quantative entropy, catagorical correlations, data.groupby(feature)[target].value_counts(),
                 featureBox.layout.visibility = 'visible'
 
+                # Quantative and Catagorical attributes
                 group = 'catagorical' if isCatagorical(data[feature]) else 'quantative'
                 missing = data[feature].isnull().sum()/len(data[feature])
-
                 shared = f'"{feature}" is {"the target" if feature == target else "a"} {group} feature of type {data[feature].dtype}.\n' \
                             f'{missing:.1%} of it is missing.'
 
+                # Catagorical description
                 if isCatagorical(data[feature]):
                     print(shared)
-                    print(f'It has an entropy of {_entropy(data[feature].value_counts(normalize=True), base=entropy):.3}.')
+                    print(f'It has an entropy of {_entropy(data[feature].value_counts(normalize=True), base=entropy):.3f}', end=', ')
+                    print(f'and a cardinaltiy of {len(data[feature].unique())}')
                     print('Value counts:')
                     print(pretty_counts(data[feature]))
 
-                # Quantative
+                # Quantative description
                 else:
                     correlations = []
                     for a, b, c in significantCorrelations(quant, corr):
@@ -385,33 +398,18 @@ def quickSummary(data,
                         correlations = f'It has no significant (>{corr:.1%}) correlations with any features'
 
                     print(shared)
-                    print(f'It has an average value of {round(data[feature].mean(), 2)}, and a median of {round(data[feature].median(), 2)}.')
+                    print(f'It has an average value of {data[feature].mean():.2f}, and a median of {data[feature].median():.2f}.')
+                    print(f'It has a minimum value of {data[feature].min():.2f}, and a maximum value of {data[feature].max():.2f}.')
                     print(correlations)
             case 'General Plots':
                 if len(quant):
                     print('Plot of Quantatative Values:')
-                    # if target in quantatative(data, relevant):
-                    #     sns.catplot(data=quant, hue=target)
-                    # else:
                     sns.catplot(data=quant)
-
                     plt.show()
                 if len(cat):
                     print('Plot of Catagorical Value Counts:')
                     todo('catagorical (count?) plots')
-                    # sns.categorical(data=cat)
-                    # for d in cat.columns:
-                    #     sns.categorical.countplot(data=cat[d])
-                    #     # try:
-                    #     if target in quantatative(data, relevant):
-                    #         sns.countplot(data=cat[d], x=target)
-                    #         sns.categorical(data=cat)
-                    #         # sns.countplot(data=cat[d], hue=target)
-                    #     else:
-                    #         sns.countplot(data=cat[d])
-                        # except ValueError:
-                            # todo('Plot is still throwing annoying errors')
-                    plt.show()
+                    # plt.show()
             case 'Matrix':
                 if len(quant):
                     print('Something Something Matrix:')
@@ -420,12 +418,46 @@ def quickSummary(data,
                     else:
                         sns.pairplot(data=quant)
                     plt.show()
-                if len(cat) and False:
-                    print('Box Plots of Catagorical Values:')
-                    # sns.boxplot(data=cat, hue=target)
-                    # display(cat)
-                    # sns.relplot(data=cat, x='mfr',  y='name', hue=target)
-                    plt.show()
+            case 'Alerts':
+                # TODO:
+                # Check that entropy isn't too low
+                # check that relative entropy isn't too low
+                # check for spikes and plummets
+                # high correlations between features
+
+                # Check if our dataset is small
+                if data[feature].count() < SMALL_DATASET:
+                    print(f"Your dataset isn't very large ({data[feature].count()}<{SMALL_DATASET})")
+
+                # Check the cardinality
+                for c in cat:
+                    card = len(data[c].unique())
+                    if card == 1:
+                        print(f'All values in feature "{c}" are the same')
+                    elif card >= data[feature].count():
+                        print(f'Every value in feature "{c}" is unique, are you sure its not quantatative?')
+                    elif card > HIGH_CARDINALITY:
+                        printf(f'Feature "{c}" has a very high cardinality ({card}>{HIGH_CARDINALITY})')
+
+                # Check we're not missing too many
+                for i in data.columns:
+                    miss = data[i].isnull().sum()/len(data[i])
+                    if miss >= ALERT_MISSING:
+                        print(f'Feature {i} is missing a significant portion ({miss}>={ALERT_MISSING})')
+
+                # Check for outliers
+                for q in quant:
+                    upper = data[q].max() - data[q].quantile(.75)
+                    upperMid = data[q].quantile(.75) - data[q].median()
+                    if upper - upperMid > OUTLIER_THRESHOLD * data[q].median():
+                        print(f'Feature {q:>{max_name_len}} may have some upper outliers', end='   | ')
+                        print(f'upper: {upper:>6.1f} | upperMid: {upperMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {upper-upperMid:>6.1f}')
+
+                    lower = data[q].quantile(.25) - data[q].min()
+                    lowerMid = data[q].median() - data[q].quantile(.25)
+                    if lower -  lowerMid > OUTLIER_THRESHOLD * data[q].median():
+                        print(f'Feature {q:>{max_name_len}} may have some lower outliers', end='   | ')
+                        print(f'lower: {lower:>6.1f} | lowerMid: {lowerMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {lower-lowerMid:>6.1f}')
             case _:
                 print('Invalid start option')
 
