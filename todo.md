@@ -1,9 +1,5 @@
 # Quick Summary
-- Add a start parameter
-- add a bunch of value_count(normalize=True) calls
-- make the unique section be formatted better
-- add relplot with hue parameter
-- add a generalized catagorical graph
+- add feature specific graphs under the features menu
 - add hue to matrix graph
 - if there are no catagorical values, remove the unique print label
 - Fix all the commended out parts
@@ -18,13 +14,15 @@
 - add induvidual plots with a combobox selecting which ones
 - add an entropy threshold option
 - detect unusual clumps of values
+- add these to the feature specific menu:
+    - mode[s], std, quantative entropy, catagorical correlations, data.groupby(feature)[target].value_counts()
+
+# SuggestedCleaning
+- A function that does a bunch of math and returns a suggested clean config
 
 # Clean
 - make a query option in clean function
-- add an option to handle unknowns by randomly insterting random values
-    - And another option to insert random values biased by how they are distributed in the data
-- fix it
-
+    - to do... things?
 
 # Ensemble
 - A function which takes a function which returns a model, and an amount, and creates a bunch of models and aggrigates the answers

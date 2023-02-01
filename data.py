@@ -20,6 +20,9 @@ from math import log, e
 # options: 'random', 'first', 'last'
 MODE_SELECTION = 'random'
 
+# np.object_ is a string type (apparently)
+_catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')))
+
 try:
     from Cope import todo
 except ImportError:
@@ -52,9 +55,6 @@ def normalizePercentage(p, error='Percentage is of the wrong type (int or float 
 
 def isiterable(obj, includeStr=False):
     return isinstance(obj, Iterable) and (type(obj) is not str if not includeStr else True)
-
-# np.object_ is a string type (apparently)
-_catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')))
 
 def sort_dict_by_value_length(d):
     return dict(sorted(d.items(), key=lambda item: len(item[1])))
@@ -169,8 +169,8 @@ def percentCountPlot(data, feature, target=None, ax=None, title='Percentage of v
     # plt.show()
     return ax
 
-# This works, but it's slow for some reason?
 def column_entropy(column:pd.Series, base=e):
+    """ This works, but it's slow for some reason? """
     vc = pd.Series(column).value_counts(normalize=True, sort=False)
     return -(vc * np.log(vc)/np.log(base)).sum()
 
@@ -189,6 +189,8 @@ def pretty_counts(s:pd.Series):
     rtn = pretty_2_column_array(s.value_counts(normalize=True, sort=True))
     return rtn
 
+
+# The main functions
 def quickSummary(data,
                  relevant=None,
                  target=None,
@@ -198,7 +200,7 @@ def quickSummary(data,
                  missing=True,
                  corr=.5,
                  entropy=None,
-                 start='Description'
+                 start='Head'
     ):
     # Parse params and make sure all the params are valid
     assert relevant is None or notRelevant is None, 'Please dont specify both relevant and not relevant columns at the same time'
@@ -233,10 +235,12 @@ def quickSummary(data,
     whatTheHeck = (corr, missing)
     max_name_len = len(max(data.columns, key=len))
 
+
     # Define widget[s]
     combobox = widgets.Dropdown(
             options=[
                 'Description',
+                'Features',
                 'Head',
                 'Stats',
                 'Missing',
@@ -244,22 +248,33 @@ def quickSummary(data,
                 'Entropy',
                 'Counts',
                 'Correlations',
-                'Features',
                 'General Plots',
-                'Specific Plots',
                 'Matrix',
             ],
             value=start,
             description='Select Summary',
+            style={'description_width': 'initial'},
+
             # title='hello there'
         )
+    # This doesn't work
+    # combobox.box_style = 'primary'
+
+    featureBox = widgets.Dropdown(
+                    options=list(data.columns),
+                    value=target,
+                    description='Feature',
+                )
+    featureBox.layout.visibility = 'hidden'
+
 
     # All the actual logic
-    def output(x):
+    def output(page, feature):
         # See baffled comment above
         corr, missing = whatTheHeck
+        featureBox.layout.visibility = 'hidden'
 
-        match x:
+        match page:
             case 'Description':
                 print(f'There are {len(data)} samples, with {len(data.columns)} columns:')
                 display(getNiceTypesTable(data))
@@ -337,47 +352,41 @@ def quickSummary(data,
                     else:
                         raise TypeError('Missing is a bad type')
             case 'Features':
-                featureBox = widgets.Dropdown(
-                    options=list(data.columns),
-                    value=target,
-                    description='Feature',
-                )
+                # TODO: mode[s], std, quantative entropy, catagorical correlations, data.groupby(feature)[target].value_counts(),
+                featureBox.layout.visibility = 'visible'
 
-                def showFeature(x):
-                    group = 'catagorical' if isCatagorical(data[x]) else 'quantative'
-                    type = data[x].dtype
-                    # mode
-                    missing = round(data[x].isnull().sum()/len(data[x]), 2)
-                    display('hello!')
+                group = 'catagorical' if isCatagorical(data[feature]) else 'quantative'
+                missing = data[feature].isnull().sum()/len(data[feature])
 
-                    shared = f'{x} is a {group} feature of type {type}.\n' \
-                             f'{missing:%} of it is NaN.\n' \
-                             f'It has a mode of {mode}'
+                shared = f'"{feature}" is {"the target" if feature == target else "a"} {group} feature of type {data[feature].dtype}.\n' \
+                            f'{missing:.1%} of it is missing.'
 
-                    if isCatagorical(data[x]):
-                        counts = pretty_counts(data[x])
-                        this_entropy = round(_entropy(data[c].value_counts(normalize=True), base=entropy), 3)
-                        print(shared +
-                            f' and an entropy of {this_entropy}\n'
-                            f'Value counts:\n'
-                            + counts
-                        )
+                if isCatagorical(data[feature]):
+                    print(shared)
+                    print(f'It has an entropy of {_entropy(data[feature].value_counts(normalize=True), base=entropy):.3}.')
+                    print('Value counts:')
+                    print(pretty_counts(data[feature]))
 
-                    # Quantative
+                # Quantative
+                else:
+                    correlations = []
+                    for a, b, c in significantCorrelations(quant, corr):
+                        other = None
+                        if a == feature:
+                            other = b
+                        elif b == feature:
+                            other = a
+                        if other is not None:
+                            correlations.append(f'{other}({c:.1%})')
+
+                    if len(correlations):
+                        correlations = 'It correlates with ' + ', '.join(correlations)
                     else:
-                        # std, mean, median
-                        correlations = significantCorrelations(quant, corr)
-                        print(shared +
-                            f', an average value of {round(data[x].mean(), 2)}, and a median of {round(data[x].median(), 2)}'
-                            f'It correlates with {correlations} by SOMETHING HERE'
-                        )
+                        correlations = f'It has no significant (>{corr:.1%}) correlations with any features'
 
-                # print('test')
-                # widgets.VBox([combobox, widgets.interactive(showFeature, x=featureBox)])
-                display(featureBox)
-                # display(widgets.VBox([combobox, featureBox]))
-                # print('test2')
-
+                    print(shared)
+                    print(f'It has an average value of {round(data[feature].mean(), 2)}, and a median of {round(data[feature].median(), 2)}.')
+                    print(correlations)
             case 'General Plots':
                 if len(quant):
                     print('Plot of Quantatative Values:')
@@ -403,14 +412,6 @@ def quickSummary(data,
                         # except ValueError:
                             # todo('Plot is still throwing annoying errors')
                     plt.show()
-            case 'Specific Plots':
-                if len(quant):
-                    print('Plots of Quantatative Values:')
-                    todo()
-
-                if len(cat):
-                    print('Plots of Catagorical Value Counts:')
-                    todo()
             case 'Matrix':
                 if len(quant):
                     print('Something Something Matrix:')
@@ -428,7 +429,10 @@ def quickSummary(data,
             case _:
                 print('Invalid start option')
 
-    return widgets.interactive(output, x=combobox)
+    widgets.interact(output, page=combobox, feature=featureBox)
+
+def suggestedCleaning(df, target):
+    todo('suggestedCleaning')
 
 def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
     global MODE_SELECTION
@@ -475,7 +479,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                             else:
                                 continue
                         mean = without[column].mean()
-                        log(f'Setting all samples with a "{column}" value of "{missing}" to the mean ({mean:.3})')
+                        log(f'Setting all samples with a "{column}" value of "{missing}" to the mean ({mean:.2})')
                         df.loc[df[column] == missing, column] = mean
                     case 'median':
                         if isCatagorical(df[column]):
@@ -496,9 +500,116 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                             mode = without[column].mode()[-1]
                         log(f'Setting all samples with a "{column}" value of "{missing}" to a mode ({mode})')
                         df.loc[df[column] == missing, column] = mode
+                    case 'random':
+                        if isCatagorical(df[column]):
+                            log(f'Setting all samples with a "{column}" value of "{missing}" to random catagories')
+                            def fill(sample):
+                                if sample == missing:
+                                    return random.choice(without[column].unique())
+                                else:
+                                    return sample
+                        else:
+                            log(f'Setting all samples with a "{column}" value of "{missing}" to random values along a uniform distrobution')
+                            def fill(sample):
+                                if sample == missing:
+                                    return type(sample)(random.uniform(without[column].min(), without[column].max()))
+                                else:
+                                    return sample
+
+                        df[column] = df[column].apply(fill)
+                    case 'balanced_random':
+                        if isCatagorical(df[column]):
+                            log(f'Setting all samples with a "{column}" value of "{missing}" to evenly distributed random catagories')
+                            def fill(sample):
+                                if sample == missing:
+                                    return random.choice(without[column])
+                                else:
+                                    return sample
+                        else:
+                            log(f'Setting all samples with a "{column}" value of "{missing}" to random values along a normal distrobution')
+                            def fill(sample):
+                                if sample == missing:
+                                    return type(sample)(random.gauss(without[column].mean(), without[column].std()))
+                                else:
+                                    return sample
+                        df[column] = df[column].apply(fill)
                     case _:
                         log(f'Setting all samples with a "{column}" value of "{missing}" to {options}')
                         df.loc[df[column] == missing, column] = options
+            if op == 'queries':
+                if options == True:
+                    if not ignoreWarnings:
+                        raise TypeError(f"Please specify a queries and values for the queries option")
+                elif options == False:
+                    continue
+                else:
+                    try:
+                        # If there's just one query, just accept it
+                        if len(options) == 2 and type(options[0]) is str:
+                            options = [options]
+
+                        for query, replacement in options:
+                            match replacement:
+                                case 'remove':
+                                    log(f'Removing all samples where "{query}" is true')
+                                    df = df.drop(df.query(query).index)
+                                case 'mean':
+                                    if isCatagorical(df[column]):
+                                        if not ignoreWarnings:
+                                            raise TypeError(f"Cannot get mean of a catagorical feature")
+                                        else:
+                                            continue
+                                    mean = df[column].mean()
+                                    log(f'Setting all samples where {query} is true to the mean of "{column}" ({mean:.2})')
+                                    df.loc[df.query(query).index, column] = mean
+                                case 'median':
+                                    if isCatagorical(df[column]):
+                                        if not ignoreWarnings:
+                                            raise TypeError(f"Cannot get median of a catagorical feature")
+                                        else:
+                                            continue
+                                    median = df[column].median()
+                                    log(f'Setting all samples where "{query}" is true to the median of "{column}" ({median})')
+                                    df.loc[df.query(query).index, column] = median
+                                case 'mode':
+                                    # I'm not sure how else to pick a mode, so just pick one at random
+                                    if MODE_SELECTION == 'random':
+                                        mode = random.choice(df[column].mode())
+                                    elif MODE_SELECTION == 'first':
+                                        mode = df[column].mode()[0]
+                                    elif MODE_SELECTION == 'last':
+                                        mode = df[column].mode()[-1]
+                                    log(f'Setting all samples where "{query}" is true to a mode of "{column}" ({mode})')
+                                    df.loc[df.query(query).index, column] = mode
+                                case 'random':
+                                    if isCatagorical(df[column]):
+                                        log(f'Setting all samples where "{query}" is true to have random catagories')
+                                        def fill(sample):
+                                            return random.choice(df[column].unique())
+                                    else:
+                                        log(f'Setting all samples where "{query}" is true to have random values along a uniform distrobution')
+                                        def fill(sample):
+                                            return type(sample)(random.uniform(df[column].min(), df[column].max()))
+
+                                    q = df.query(query)
+                                    df.loc[q.index, column] = q[column].apply(fill)
+                                case 'balanced_random':
+                                    if isCatagorical(df[column]):
+                                        log(f'Setting all samples where "{query}" is true to have evenly distributed random catagories')
+                                        def fill(sample):
+                                            return random.choice(df[column])
+                                    else:
+                                        log(f'Setting all samples where "{query}" is true to have random values along a normal distrobution')
+                                        def fill(sample):
+                                            return type(sample)(random.gauss(df[column].mean(), df[column].std()))
+
+                                    q = df.query(query)
+                                    df.loc[q.index, column] = q[column].apply(fill)
+                                case _:
+                                    log(f'Setting all samples where "{query}" is true to have a "{column}" value of  {options}')
+                                    df.loc[df.query(query).index, column] = replacement
+                    except ValueError:
+                        raise TypeError(f"Invalid queries option. It's supposed to be a list of 2 item tuples.")
             if op == 'remove':
                 log(f'Removing all samples with a "{column}" value of {options}')
                 df = df.loc[df[column] != options]
@@ -563,8 +674,8 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
     return df
 
 def clean(df:pd.DataFrame,
-        config               :Dict[str, Dict[str, Any]],
-        verbose              :bool=False,
+        config: Dict[str, Dict[str, Any]],
+        verbose:bool=False,
     ) -> pd.DataFrame:
     """ Returns a cleaned copy of the DataFrame passed to it
         NOTE: The order of the entries in the config dict determine the order they are performed
@@ -580,24 +691,29 @@ def clean(df:pd.DataFrame,
                         # Drop duplicate samples
                         # Only applies to all
                         'drop_duplicates': bool,
-                        # If provided, maps feature values to a dictionary
+                        # Maps feature values to a dictionary
                         'replace': Union[bool, Dict],
-                        # If provided, applies a function to the column
+                        # Applies a function to the column
                         'apply': Union[bool, Callable],
+                        # A list of (query, replacements)
+                        'queries': Union[bool, List[Tuple[str, Union['remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any]]]]
                         # A ndarray of shape (1, n) of values to create a new column with the given name
                         # Calling from a specific column has no effect, behaves the same under all
                         'add_column': Tuple[str, np.ndarray],
-                        # If provided, specifies a value that is equivalent to the feature being missing
+                        # Specifies a value that is equivalent to the feature being missing
                         'missing_value': Any,
-                        # If provided, specifies a method by which to transform samples with missing features
-                        'handle_missing': Union[bool, 'remove', 'mean', 'median', 'mode', Any],
-                        # If provided, removes all samples with the given value
+                        # Specifies a method by which to transform samples with missing features
+                        # 'random' replaces missing values with either a random catagory, or a random number between min and max
+                        # 'balanced_random' replaces missing values with either a randomly sampled catagory (sampled from the column
+                        # itself, so it's properly biased), or a normally distributed sample
+                        'handle_missing': Union[bool, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any],
+                        # Removes all samples with the given value
                         'remove': Union[bool, Any],
-                        # If provided, specifies a method by which to bin the quantative value, or specify custom ranges
+                        # Specifies a method by which to bin the quantative value, or specify custom ranges
                         'bin': Union[bool, Tuple['frequency', int], Tuple['width', int], Iterable],
-                        # If provided, specifies a method by which to normalize the quantative values
+                        # Specifies a method by which to normalize the quantative values
                         'normalize': Union[bool, 'min-max', 'range'],
-                        # If provided, specifies a method by which to convert a catagorical feature to a quantative one
+                        # Specifies a method by which to convert a catagorical feature to a quantative one
                         'convert_numeric': Union[bool, 'assign', 'one_hot_encode'],
                 },
     }
@@ -625,12 +741,9 @@ def clean(df:pd.DataFrame,
                 # already done (we want column specific options to override all, and we don't want
                 # to redo them)
                 adjusted = args.copy()
-                # print(f'checking if {c} is in {config.keys()}')
                 if c in config.keys():
                     for op, params in config[c].items():
-                        # print(f'checking if {params} is False')
-                        # if params == False:
-                            # log(f'\tExcluding column {c} from {op}')
+                        log(f'\tExcluding column {c} from {op}')
                         if op in adjusted.keys():
                             del adjusted[op]
                 df = _cleanColumn(df, adjusted, c, verbose, True)
