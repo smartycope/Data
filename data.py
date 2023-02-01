@@ -274,19 +274,19 @@ def quickSummary(data,
     # under the features page
     featureBox = widgets.Dropdown(
                     options=list(data.columns),
-                    value=target,
+                    value=target if target is not None else list(data.columns)[0],
                     description='Feature',
                 )
     featureBox.layout.visibility = 'hidden'
     featureABox = widgets.Dropdown(
         options=list(data.columns),
-                    value=target,
+                    value=target if target is not None else list(data.columns)[0],
                     description='x',
         )
     featureABox.layout.visibility = 'hidden'
     featureBBox = widgets.Dropdown(
         options=list(data.columns),
-                    value=target,
+                    value=target if target is not None else list(data.columns)[0],
                     description='y',
         )
     featureBBox.layout.visibility = 'hidden'
@@ -412,8 +412,8 @@ def quickSummary(data,
                         correlations = f'It has no significant (>{corr:.1%}) correlations with any features'
 
                     print(shared)
-                    print(f'It has an average value of {data[feature].mean():.2f}, and a median of {data[feature].median():.2f}.')
-                    print(f'It has a minimum value of {data[feature].min():.2f}, and a maximum value of {data[feature].max():.2f}.')
+                    print(f'It has an average value of {data[feature].mean():,.2f}, and a median of {data[feature].median():,.2f}.')
+                    print(f'It has a minimum value of {data[feature].min():,.2f}, and a maximum value of {data[feature].max():,.2f}.')
                     print(correlations)
         elif page == 'General Plots':
                 if len(quant):
@@ -458,7 +458,7 @@ def quickSummary(data,
                     elif card >= data[feature].count():
                         print(f'Every value in feature "{c}" is unique, are you sure its not quantatative?')
                     elif card > HIGH_CARDINALITY:
-                        printf(f'Feature "{c}" has a very high cardinality ({card}>{HIGH_CARDINALITY})')
+                        print(f'Feature "{c}" has a very high cardinality ({card}>{HIGH_CARDINALITY})')
 
                 # Check we're not missing too many
                 for i in data.columns:
