@@ -440,7 +440,7 @@ def quickSummary(data,
                     print(f'It has a minimum value of {data[feature].min():,.2f}, and a maximum value of {data[feature].max():,.2f}.')
                     print(correlations)
 
-                    sns.scatterplot(data[feature])
+                    sns.scatterplot(data=data[feature])
                     plt.show()
 
                 print()
