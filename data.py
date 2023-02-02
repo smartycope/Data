@@ -508,17 +508,20 @@ def quickSummary(data,
 
                 # Check for outliers
                 for q in quant:
-                    upper = data[q].max() - data[q].quantile(.75)
-                    upperMid = data[q].quantile(.75) - data[q].median()
-                    if upper - upperMid > OUTLIER_THRESHOLD * data[q].median():
-                        print(f'Feature {q:>{max_name_len}} may have some upper outliers', end='   | ')
-                        print(f'upper: {upper:>6.1f} | upperMid: {upperMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {upper-upperMid:>6.1f}')
+                    try:
+                        upper = data[q].max() - data[q].quantile(.75)
+                        upperMid = data[q].quantile(.75) - data[q].median()
+                        if upper - upperMid > OUTLIER_THRESHOLD * data[q].median():
+                            print(f'Feature {q:>{max_name_len}} may have some upper outliers', end='   | ')
+                            print(f'upper: {upper:>6.1f} | upperMid: {upperMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {upper-upperMid:>6.1f}')
 
-                    lower = data[q].quantile(.25) - data[q].min()
-                    lowerMid = data[q].median() - data[q].quantile(.25)
-                    if lower -  lowerMid > OUTLIER_THRESHOLD * data[q].median():
-                        print(f'Feature {q:>{max_name_len}} may have some lower outliers', end='   | ')
-                        print(f'lower: {lower:>6.1f} | lowerMid: {lowerMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {lower-lowerMid:>6.1f}')
+                        lower = data[q].quantile(.25) - data[q].min()
+                        lowerMid = data[q].median() - data[q].quantile(.25)
+                        if lower -  lowerMid > OUTLIER_THRESHOLD * data[q].median():
+                            print(f'Feature {q:>{max_name_len}} may have some lower outliers', end='   | ')
+                            print(f'lower: {lower:>6.1f} | lowerMid: {lowerMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {lower-lowerMid:>6.1f}')
+                    except TypeError:
+                        todo('checking dates for outliers isnt implemented')
         else:
                 print('Invalid start option')
 
