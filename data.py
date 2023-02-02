@@ -309,7 +309,7 @@ def quickSummary(data,
 
         # match page:
         if page == 'Description':
-                print(f'There are {len(data)} samples, with {len(data.columns)} columns:')
+                print(f'There are {len(data):,} samples, with {len(data.columns)} columns:')
                 display(getNiceTypesTable(data))
 
                 print()
@@ -393,6 +393,7 @@ def quickSummary(data,
                     else:
                         raise TypeError('Missing is a bad type')
         elif page == 'Features':
+                todo('Add nice plots here: scatterplots, histograms, and relating to the target feature')
                 # TODO: mode[s], std, quantative entropy, catagorical correlations, data.groupby(feature)[target].value_counts(),
                 featureBox.layout.visibility = 'visible'
 
@@ -446,7 +447,10 @@ def quickSummary(data,
 
                 graph = sns.scatterplot(x=data[a], y=data[b])
                 if isQuantatative(data[a]) and isQuantatative(data[b]):
-                    graph.set(title=f'Correlation: {data.corr()[a][b]}')
+                    try:
+                        graph.set(title=f'Correlation: {data.corr()[a][b]}')
+                    except KeyError:
+                        print('Cant calculate the correlations of dates for some reason')
                 else:
                     # counts = data.groupby(a)[b].value_counts()
                     # print(counts.index.max())
