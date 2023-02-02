@@ -546,7 +546,8 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
     global MODE_SELECTION
     log = lambda s: print('\t' + s) if verbose else None
     missing = np.nan
-    if column in df.columns:
+    # We're allowing column to be None for the specific case of add_column (which doesn't require a column)
+    if column in df.columns or column is None:
         for op, options in args.items():
             if op == 'drop_duplicates':
                 if options:
@@ -864,6 +865,11 @@ def clean(df:pd.DataFrame,
     for column, args in config.items():
         log(f'Working on "{column}"')
         if column.lower() == 'all':
+            # We only want to add new columns once (not inside the for loop)
+            if 'add_column' in args:
+                df = _cleanColumn(df, args, None, verbose)
+                del args['add_column']
+
             # dropping duplicates means something different on the scale of a single column
             # than it does applied to the whole table
             if 'drop_duplicates' in args:
