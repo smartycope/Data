@@ -30,7 +30,7 @@ ALERT_MISSING = .55
 OUTLIER_THRESHOLD = .5
 
 # np.object_ is a string type (apparently)
-_catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')))
+_catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')), bool, np.bool_, np.bool8)
 
 try:
     from Cope import todo
@@ -316,31 +316,32 @@ def quickSummary(data,
         # match page:
         if   page == 'Description':
                 print(f'There are {len(data):,} samples, with {len(data.columns)} columns:')
+                print()
                 print(', '.join(data.columns))
+                print()
                 print('which have types:')
                 display(getNiceTypesTable(data))
 
-                print()
+                if len(quant):
+                    print('\nThe possible values for the Catagorical values:')
+                    # This is just an overly complicated way to print them all nicely
+                    for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in cat])).items():
+                        # If it has too high of a cardinality, just print the first few
+                        card = len(value)
+                        shortened = False
+                        if card > 30:
+                            shortened = True
+                            value = value[:29]
 
-                print('The possible values for the Catagorical values:')
-                # This is just an overly complicated way to print them all nicely
-                for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in cat])).items():
-                    # If it has too high of a cardinality, just print the first few
-                    card = len(value)
-                    shortened = False
-                    if card > 30:
-                        shortened = True
-                        value = value[:29]
-
-                    print(key + ":")
-                    joined_list = ", ".join(value)
-                    if len(joined_list) <= 80: # adjust this number as needed
-                        print('   ' + joined_list)
-                    else:
-                        for item in value:
-                            print('   ' + item)
-                    if shortened:
-                        print(f'... ({card - 29} more catagories)')
+                        print(key + ":")
+                        joined_list = ", ".join(value)
+                        if len(joined_list) <= 80: # adjust this number as needed
+                            print('   ' + joined_list)
+                        else:
+                            for item in value:
+                                print('   ' + item)
+                        if shortened:
+                            print(f'... ({card - 29} more catagories)')
         elif page == 'Stats':
                 if len(quant):
                     # print('Summary of Quantatative Values:')
@@ -870,7 +871,7 @@ def clean(df:pd.DataFrame,
                 df = _cleanColumn(df, args, None, verbose)
                 del args['add_column']
 
-            # dropping duplicates means something different on the scale of a single column
+            # Dropping duplicates means something different on the scale of a single column
             # than it does applied to the whole table
             if 'drop_duplicates' in args:
                 log('Dropping duplicate samples')
