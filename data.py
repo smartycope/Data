@@ -214,12 +214,14 @@ def quickSummary(data,
                  missing=True,
                  corr=.5,
                  entropy=None,
-                 start='Head'
+                 start='Head',
+                 startFeature=None,
     ):
     # Parse params and make sure all the params are valid
     assert relevant is None or notRelevant is None, 'Please dont specify both relevant and not relevant columns at the same time'
     assert not isinstance(target, (list, tuple)), 'There can only be 1 target feature'
     assert target is None or target in data.columns, f'Target {target} is not one of the features'
+    assert startFeature is None or startFeature in data.columns, 'startFeature must be a valid column name'
 
     if relevant is None:
         relevant = list(data.columns)
@@ -234,7 +236,11 @@ def quickSummary(data,
     relevant = list(relevant)
     for i in relevant:
         assert i in data.columns, f'{i} is not one of the features'
-
+    if startFeature is None:
+        if target is not None:
+            startFeature = target
+        else:
+            startFeature = data.columns[0]
 
     # Define variables
     _relevant = data[relevant]
@@ -280,19 +286,19 @@ def quickSummary(data,
     # under the features page
     featureBox = widgets.Dropdown(
                     options=list(data.columns),
-                    value=target if target is not None else list(data.columns)[0],
+                    value=startFeature,
                     description='Feature',
                 )
     featureBox.layout.visibility = 'hidden'
     featureABox = widgets.Dropdown(
         options=list(data.columns),
-                    value=target if target is not None else list(data.columns)[0],
+                    value=startFeature,
                     description='x',
         )
     featureABox.layout.visibility = 'hidden'
     featureBBox = widgets.Dropdown(
         options=list(data.columns),
-                    value=target if target is not None else list(data.columns)[0],
+                    value=startFeature,
                     description='y',
         )
     featureBBox.layout.visibility = 'hidden'
@@ -393,7 +399,6 @@ def quickSummary(data,
                     else:
                         raise TypeError('Missing is a bad type')
         elif page == 'Features':
-                todo('Add nice plots here: scatterplots, histograms, and relating to the target feature')
                 # TODO: mode[s], std, quantative entropy, catagorical correlations, data.groupby(feature)[target].value_counts(),
                 featureBox.layout.visibility = 'visible'
 
@@ -410,6 +415,8 @@ def quickSummary(data,
                     print(f'and a cardinaltiy of {len(data[feature].unique())}')
                     print('Value counts:')
                     print(pretty_counts(data[feature]))
+
+                    sns.histplot(data[feature])
 
                 # Quantative description
                 else:
@@ -432,6 +439,12 @@ def quickSummary(data,
                     print(f'It has an average value of {data[feature].mean():,.2f}, and a median of {data[feature].median():,.2f}.')
                     print(f'It has a minimum value of {data[feature].min():,.2f}, and a maximum value of {data[feature].max():,.2f}.')
                     print(correlations)
+
+                    sns.scatterplot(data[feature])
+                    plt.show()
+
+                print()
+                todo('Add nice plots here: scatterplots, histograms, and relating to the target feature')
         elif page == 'General Plots':
                 if len(quant):
                     print('Plot of Quantatative Values:')
