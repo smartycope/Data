@@ -555,23 +555,23 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                     warn('drop_duplicates hasnt been implemented yet for induvidual columns. What are you trying to do?')
                     # log(f'Dropping duplicates in {column}')
                     # df[column].drop_duplicates(inplace=True)
-            if op == 'replace':
+            elif op == 'replace':
                 if options == True:
                     if not ignoreWarnings:
                         raise TypeError(f"Please specify a dict for the replace option")
                 if isinstance(options, dict):
                     log(f'Replacing {column}')
                     df[column] = df[column].replace(options)
-            if op == 'apply':
+            elif op == 'apply':
                 if options == True:
                     if not ignoreWarnings:
                         raise TypeError(f"Please specify a function to apply")
                 elif callable(options):
                     log(f'Applying function to {column}')
                     df[column] = df[column].apply(options)
-            if op == 'missing_value':
+            elif op == 'missing_value':
                 missing = options
-            if op == 'handle_missing':
+            elif op == 'handle_missing':
                 without = df.loc[df[column] != missing]
                 # match options:
                 if isinstance(options, pd.Series):
@@ -654,7 +654,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                 else:
                         log(f'Setting all samples with a "{column}" value of "{missing}" to {options}')
                         df.loc[df[column] == missing, column] = options
-            if op == 'queries':
+            elif op == 'queries':
                 if options == True:
                     if not ignoreWarnings:
                         raise TypeError(f"Please specify a queries and values for the queries option")
@@ -736,10 +736,10 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                                     df.loc[df.query(query).index, column] = replacement
                     # except ValueError:
                         # raise TypeError(f"Invalid queries option. It's supposed to be a list of 2 item tuples.")
-            if op == 'remove':
+            elif op == 'remove':
                 log(f'Removing all samples with a "{column}" value of {options}')
                 df = df.loc[df[column] != options]
-            if op == 'bin':
+            elif op == 'bin':
                 if isCatagorical(df[column]):
                     if not ignoreWarnings:
                         warn(f'The bin option was set on "{column}", which is not quantatative, skipping.')
@@ -760,7 +760,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                             df[column] = pd.cut(df[column], options)
                     else:
                         raise TypeError(f"Bin option given bad arguement")
-            if op == 'normalize':
+            elif op == 'normalize':
                 if isCatagorical(df[column]):
                     if not ignoreWarnings:
                         warn(f'The normalize option was set on {column}, which is not quantatative, skipping.')
@@ -776,7 +776,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         df[column] = (df[column]-df[column].mean())/df[column].std()
                     else:
                         raise TypeError('Invalid normalize argument given')
-            if op == 'convert_numeric':
+            elif op == 'convert_numeric':
                 if isQuantatative(df[column]):
                     if not ignoreWarnings:
                         warn(f'The conver_numeric option was set on {column}, which is not catagorical, skipping.')
@@ -791,7 +791,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         df = pd.get_dummies(df, columns=[column])
                     else:
                         raise TypeError(f"Bad arguement given to convert_numeric")
-            if op == 'add_column':
+            elif op == 'add_column':
                 if isinstance(options, (tuple, list)):
                     if not isinstance(options[0], (tuple, list)):
                         options = [options]
@@ -800,10 +800,12 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                         df[name] = selection
                 else:
                     raise TypeError(f"add_column argument must be a tuple, or a list of tuples, not {type(options)}")
-            if op == 'drop':
+            elif op == 'drop':
                 if options:
                     log(f'Dropping column "{column}"')
                     df = df.drop(columns=[column])
+            else:
+                raise TypeError(f'Invalid arguement {op} given')
     else:
         raise TypeError(f'Column "{column}" provided is not in the given DataFrame')
 
@@ -868,13 +870,14 @@ def clean(df:pd.DataFrame,
         if column.lower() == 'all':
             # We only want to add new columns once (not inside the for loop)
             if 'add_column' in args:
-                df = _cleanColumn(df, args, None, verbose)
+                # We only want to call that command manually
+                df = _cleanColumn(df, {'add_column': args['add_column']}, None, verbose)
                 del args['add_column']
 
             # Dropping duplicates means something different on the scale of a single column
             # than it does applied to the whole table
             if 'drop_duplicates' in args:
-                log('Dropping duplicate samples')
+                log('\tDropping duplicate samples')
                 df = df.drop_duplicates()
                 del args['drop_duplicates']
 
