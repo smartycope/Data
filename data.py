@@ -314,8 +314,10 @@ def quickSummary(data,
         clear_output(wait=True)
 
         # match page:
-        if page == 'Description':
+        if   page == 'Description':
                 print(f'There are {len(data):,} samples, with {len(data.columns)} columns:')
+                print(', '.join(data.columns))
+                print('which have types:')
                 display(getNiceTypesTable(data))
 
                 print()
@@ -337,7 +339,8 @@ def quickSummary(data,
                     else:
                         for item in value:
                             print('   ' + item)
-                    print(f'... ({card - 29} more catagories)')
+                    if shortened:
+                        print(f'... ({card - 29} more catagories)')
         elif page == 'Stats':
                 if len(quant):
                     # print('Summary of Quantatative Values:')
@@ -461,7 +464,7 @@ def quickSummary(data,
                 graph = sns.scatterplot(x=data[a], y=data[b])
                 if isQuantatative(data[a]) and isQuantatative(data[b]):
                     try:
-                        graph.set(title=f'Correlation: {data.corr()[a][b]}')
+                        graph.set(title=f'Correlation: {data.corr()[a][b]:0.1%}')
                     except KeyError:
                         print('Cant calculate the correlations of dates for some reason')
                 else:
@@ -534,6 +537,7 @@ def quickSummary(data,
        )
     out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox})
     display(ui, out)
+explore = quickSummary
 
 def suggestedCleaning(df, target):
     todo('suggestedCleaning')
@@ -568,7 +572,15 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
             if op == 'handle_missing':
                 without = df.loc[df[column] != missing]
                 # match options:
-                if options == True:
+                if isinstance(options, pd.Series):
+                        def fill(sample):
+                            if sample[column] == missing:
+                                return options[sample.name]
+                            else:
+                                return sample[column]
+                        log(f'Replacing all samples with a "{column}" value of "{missing}" with their indexes in "{options.name}"')
+                        df[column] = df.apply(fill, axis=1)
+                elif options == True:
                         if not ignoreWarnings:
                             raise TypeError(f"Please specify a value or method for the handle_missing option")
                 elif options == False:
@@ -647,14 +659,22 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                 elif options == False:
                     continue
                 else:
-                    try:
+                    # try:
                         # If there's just one query, just accept it
                         if len(options) == 2 and type(options[0]) is str:
                             options = [options]
 
                         for query, replacement in options:
                             # match replacement:
-                            if replacement == 'remove':
+                            if isinstance(replacement, pd.Series):
+                                    def fill(sample):
+                                        return replacement[sample.name]
+
+                                    log(f'Changing all samples where "{query}" is true to have the {column} values of their indecies in "{replacement.name}"')
+                                    q = df.query(query)
+                                    df.loc[q.index, column] = q.apply(fill, axis=1)
+                                    # df[column] = df.apply(fill, axis=1)
+                            elif replacement == 'remove':
                                     log(f'Removing all samples where "{query}" is true')
                                     df = df.drop(df.query(query).index)
                             elif replacement == 'mean':
@@ -712,8 +732,8 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                             else:
                                     log(f'Setting all samples where "{query}" is true to have a "{column}" value of  {options}')
                                     df.loc[df.query(query).index, column] = replacement
-                    except ValueError:
-                        raise TypeError(f"Invalid queries option. It's supposed to be a list of 2 item tuples.")
+                    # except ValueError:
+                        # raise TypeError(f"Invalid queries option. It's supposed to be a list of 2 item tuples.")
             if op == 'remove':
                 log(f'Removing all samples with a "{column}" value of {options}')
                 df = df.loc[df[column] != options]
@@ -770,10 +790,14 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                     else:
                         raise TypeError(f"Bad arguement given to convert_numeric")
             if op == 'add_column':
-                name, selection = options
-                log(f'Adding new column "{name}"')
-                # df[name] = df[column][selection]
-                df[name] = selection
+                if isinstance(options, (tuple, list)):
+                    if not isinstance(options[0], (tuple, list)):
+                        options = [options]
+                    for name, selection in options:
+                        log(f'Adding new column "{name}"')
+                        df[name] = selection
+                else:
+                    raise TypeError(f"add_column argument must be a tuple, or a list of tuples, not {type(options)}")
             if op == 'drop':
                 if options:
                     log(f'Dropping column "{column}"')
@@ -805,18 +829,19 @@ def clean(df:pd.DataFrame,
                         'replace': Union[bool, Dict],
                         # Applies a function to the column
                         'apply': Union[bool, Callable],
-                        # A list of (query, replacements)
-                        'queries': Union[bool, List[Tuple[str, Union['remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any]]]]
+                        # A list of (query, replacements).
+                        # If a Series is given, it will replace those values with the values at it's corresponding index
+                        # 'random' replaces values with either a random catagory, or a random number between min and max
+                        # 'balanced_random' replaces values with either a randomly sampled catagory (sampled from the column
+                        # itself, so it's properly biased), or a normally distributed sample
+                        'queries': Union[bool, List[Tuple[str, Union[Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any]]]],
                         # A ndarray of shape (1, n) of values to create a new column with the given name
                         # Calling from a specific column has no effect, behaves the same under all
-                        'add_column': Tuple[str, np.ndarray],
+                        'add_column': Union[Tuple[str, np.ndarray], List[Tuple[str, np.ndarray]]],
                         # Specifies a value that is equivalent to the feature being missing
                         'missing_value': Any,
-                        # Specifies a method by which to transform samples with missing features
-                        # 'random' replaces missing values with either a random catagory, or a random number between min and max
-                        # 'balanced_random' replaces missing values with either a randomly sampled catagory (sampled from the column
-                        # itself, so it's properly biased), or a normally distributed sample
-                        'handle_missing': Union[bool, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any],
+                        # Specifies a method by which to transform samples with missing features. Acts just like queries, but with missing values specifically
+                        'handle_missing': Union[bool, Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any],
                         # Removes all samples with the given value
                         'remove': Union[bool, Any],
                         # Specifies a method by which to bin the quantative value, or specify custom ranges
@@ -825,8 +850,8 @@ def clean(df:pd.DataFrame,
                         'normalize': Union[bool, 'min-max', 'range'],
                         # Specifies a method by which to convert a catagorical feature to a quantative one
                         'convert_numeric': Union[bool, 'assign', 'one_hot_encode'],
-                },
-    }
+                    },
+                }
     """
     df = df.copy()
     log = lambda s: print(s) if verbose else None
