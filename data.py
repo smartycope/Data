@@ -814,7 +814,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
 def clean(df:pd.DataFrame,
         config: Dict[str, Dict[str, Any]],
         verbose:bool=False,
-        split:bool=False,
+        split:str=None,
     ) -> pd.DataFrame:
     """ Returns a cleaned copy of the DataFrame passed to it
         NOTE: The order of the entries in the config dict determine the order they are performed
@@ -895,11 +895,11 @@ def clean(df:pd.DataFrame,
                 df = _cleanColumn(df, adjusted, c, verbose, True)
         else:
             df = _cleanColumn(df, args, column, verbose)
-    if split:
-        if target is not None:
+    if split is not None:
+        if split in df.columns:
             return df.drop(columns=target), df[target]
         else:
-            raise TypeError('Cannot split the data if you dont provvide a target feature')
+            raise TypeError('Provided feature not in the resulting data (did you drop it in the cleaning process by accident?)')
     else:
         return df
 
@@ -981,3 +981,6 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
             print(f'\tR^2 Score:              {r2_score(trian,                trainPredictions):.{accuracy}}')
             explain('An average of how far off we are from just using the mean as a prediction. Larger is better.')
 fullTest = evaluate
+
+def importances():
+    todo()
