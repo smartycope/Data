@@ -814,6 +814,7 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
 def clean(df:pd.DataFrame,
         config: Dict[str, Dict[str, Any]],
         verbose:bool=False,
+        split:bool=False,
     ) -> pd.DataFrame:
     """ Returns a cleaned copy of the DataFrame passed to it
         NOTE: The order of the entries in the config dict determine the order they are performed
@@ -894,7 +895,13 @@ def clean(df:pd.DataFrame,
                 df = _cleanColumn(df, adjusted, c, verbose, True)
         else:
             df = _cleanColumn(df, args, column, verbose)
-    return df
+    if split:
+        if target is not None:
+            return df.drop(columns=target), df[target]
+        else:
+            raise TypeError('Cannot split the data if you dont provvide a target feature')
+    else:
+        return df
 
 def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversample', seed=None):
     # match method:
