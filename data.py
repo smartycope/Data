@@ -897,7 +897,7 @@ def clean(df:pd.DataFrame,
             df = _cleanColumn(df, args, column, verbose)
     if split is not None:
         if split in df.columns:
-            return df.drop(columns=target), df[target]
+            return df.drop(columns=split), df[split]
         else:
             raise TypeError('Provided feature not in the resulting data (did you drop it in the cleaning process by accident?)')
     else:
