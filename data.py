@@ -205,17 +205,17 @@ def pretty_counts(s:pd.Series):
 
 
 # The main functions
-def quickSummary(data,
-                 relevant=None,
-                 target=None,
-                 notRelevant=None,
-                 stats=None,
-                 additionalStats=[],
-                 missing=True,
-                 corr=.5,
-                 entropy=None,
-                 start='Head',
-                 startFeature=None,
+def explore(data,
+            relevant=None,
+            target=None,
+            notRelevant=None,
+            stats=None,
+            additionalStats=[],
+            missing=True,
+            corr=.5,
+            entropy=None,
+            start='Head',
+            startFeature=None,
     ):
     # Parse params and make sure all the params are valid
     assert relevant is None or notRelevant is None, 'Please dont specify both relevant and not relevant columns at the same time'
@@ -538,7 +538,7 @@ def quickSummary(data,
        )
     out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox})
     display(ui, out)
-explore = quickSummary
+quickSummary = explore
 
 def suggestedCleaning(df, target):
     todo('suggestedCleaning')
@@ -914,7 +914,7 @@ def ensemble(modelFunc, amt):
     """ Trains an {amt} of models for you, and then aggregates answers"""
     todo('Write ensemble function')
 
-def fullTest(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explanation=False):
+def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explanation=False):
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
     explain = lambda s: print('\t\t' + s) if explanation else None
     if isinstance(testPredictions[0].dtype, _catagoricalTypes):
@@ -969,3 +969,4 @@ def fullTest(test, testPredictions, train=None, trainPredictions=None, accuracy=
             explain('Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.')
             print(f'\tR^2 Score:              {r2_score(trian,                trainPredictions):.{accuracy}}')
             explain('An average of how far off we are from just using the mean as a prediction. Larger is better.')
+fullTest = evaluate
