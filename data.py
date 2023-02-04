@@ -1,4 +1,6 @@
 import pandas as pd
+from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 from warnings import warn
 import random
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
@@ -916,10 +918,6 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
     return X, y
-
-def ensemble(modelFunc, amt):
-    """ Trains an {amt} of models for you, and then aggregates answers"""
-    todo('Write ensemble function')
 
 def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explanation=False):
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'

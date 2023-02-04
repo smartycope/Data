@@ -27,8 +27,5 @@
 # Clean
 - Make add column a list so we can do it more than once
 
-# Ensemble
-- A function which takes a function which returns a model, and an amount, and creates a bunch of models and aggrigates the answers
-
 # Resample
 - It should work, but I haven't tested it yet
