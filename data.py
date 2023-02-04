@@ -18,6 +18,7 @@ from collections import OrderedDict
 from sympy import Integer, Float
 from IPython.display import clear_output, display
 from math import log, e
+import sklearn.model_selection as skms
 
 # If there's mutliple modes, how do we want to choose one? Used in _cleanColumn
 # options: 'random', 'first', 'last'
@@ -924,13 +925,13 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
     explain = lambda s: print('\t\t' + s) if explanation else None
     if isinstance(testPredictions[0].dtype, _catagoricalTypes):
         print('Test:')
-        print(f'\tF1:        {sk.metrics.f1_score(test,        testPredictions):.{accuracy}}')
+        print(f'\tF1:        {sk.metrics.f1_score(test,        testPredictions):.{accuracy}f}')
         explain('F1 is essentially an averaged score combining precision and recall')
-        print(f'\tAccuracy:  {sk.metrics.accuracy_score(test,  testPredictions):.{accuracy}}')
+        print(f'\tAccuracy:  {sk.metrics.accuracy_score(test,  testPredictions):.{accuracy}f}')
         explain('Accuracy is a measure of how well the model did on average')
-        print(f'\tPrecision: {sk.metrics.precision_score(test, testPredictions):.{accuracy}}')
+        print(f'\tPrecision: {sk.metrics.precision_score(test, testPredictions):.{accuracy}f}')
         explain('Precision is a measure of how many things we said were true and we were wrong')
-        print(f'\tRecall:    {sk.metrics.recall_score(test,    testPredictions):.{accuracy}}')
+        print(f'\tRecall:    {sk.metrics.recall_score(test,    testPredictions):.{accuracy}f}')
         explain('Recall is a measure of how many things we missed out on')
         if confusion:
             ConfusionMatrixDisplay.from_predictions(test, testPredictions, cmap='Blues')
@@ -940,13 +941,13 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
 
         if train is not None and trainPredictions is not None:
             print('Train:')
-            print(f'\tF1:        {sk.metrics.f1_score(train,        trainPredictions):.{accuracy}}')
+            print(f'\tF1:        {sk.metrics.f1_score(train,        trainPredictions):.{accuracy}f}')
             explain('F1 is essentially an averaged score combining precision and recall')
-            print(f'\tAccuracy:  {sk.metrics.accuracy_score(train,  trainPredictions):.{accuracy}}')
+            print(f'\tAccuracy:  {sk.metrics.accuracy_score(train,  trainPredictions):.{accuracy}f}')
             explain('Accuracy is a measure of how well the model did on average')
-            print(f'\tPrecision: {sk.metrics.precision_score(train, trainPredictions):.{accuracy}}')
+            print(f'\tPrecision: {sk.metrics.precision_score(train, trainPredictions):.{accuracy}f}')
             explain('Precision is a measure of how many samples we accurately predicted?')
-            print(f'\tRecall:    {sk.metrics.recall_score(train,    trainPredictions):.{accuracy}}')
+            print(f'\tRecall:    {sk.metrics.recall_score(train,    trainPredictions):.{accuracy}f}')
             explain('Recall is a measure of how many times we accurately predicted a specific condition')
         if confusion:
             ConfusionMatrixDisplay.from_predictions(train, trainPredictions, cmap='Blues')
@@ -957,26 +958,26 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
     # Quantative measures
     else:
         print('Test:')
-        # print(f'\tMean Square Error:      {mean_squared_error(test,      testPredictions):.{accuracy}}')
-        print(f'\tRoot Mean Square Error: {mean_squared_error(test, testPredictions, squared=False):.{accuracy}}')
+        # print(f'\tMean Square Error:      {mean_squared_error(test,      testPredictions):.{accuracy}f}')
+        print(f'\tRoot Mean Square Error: {mean_squared_error(test, testPredictions, squared=False):.{accuracy}f}')
         explain('An average of how far off we are from the target, in the same units as the target. Smaller is better.')
-        print(f'My own measure:           {mean_squared_error(test, testPredictions, squared=False) / test.mean()}')
+        print(f'\tMy own measure:         {mean_squared_error(test, testPredictions, squared=False) / test.mean()}')
         explain('Root mean square / average value. Eliminates the domain a bit. Smaller is better.')
-        print(f'\tMean Absolute Error:    {mean_absolute_error(test,     testPredictions):.{accuracy}}')
+        print(f'\tMean Absolute Error:    {mean_absolute_error(test,     testPredictions):.{accuracy}f}')
         explain('Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.')
-        print(f'\tR^2 Score:              {r2_score(test,                testPredictions):.{accuracy}}')
+        print(f'\tR^2 Score:              {r2_score(test,                testPredictions):.{accuracy}f}')
         explain('An average of how far off we are from just using the mean as a prediction. Larger is better.')
 
         if train is not None and trainPredictions is not None:
             print('Train:')
-            # print(f'\tMean Square Error:      {mean_squared_error(train,      trainPredictions):.{accuracy}}')
-            print(f'\tRoot Mean Square Error: {mean_squared_error(train, trainPredictions, squared=False):.{accuracy}}')
+            # print(f'\tMean Square Error:      {mean_squared_error(train,      trainPredictions):.{accuracy}f}')
+            print(f'\tRoot Mean Square Error: {mean_squared_error(train, trainPredictions, squared=False):.{accuracy}f}')
             explain('An average of how far off we are from the target, in the same units as the target. Smaller is better.')
-            print(f'My own measure:           {mean_squared_error(test, testPredictions, squared=False) / test.mean()}')
+            print(f'\tMy own measure:         {mean_squared_error(test, testPredictions, squared=False) / test.mean()}')
             explain('Root mean square / average value. Eliminates the domain a bit. Smaller is better.')
-            print(f'\tMean Absolute Error:    {mean_absolute_error(train,     trainPredictions):.{accuracy}}')
+            print(f'\tMean Absolute Error:    {mean_absolute_error(train,     trainPredictions):.{accuracy}f}')
             explain('Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.')
-            print(f'\tR^2 Score:              {r2_score(trian,                trainPredictions):.{accuracy}}')
+            print(f'\tR^2 Score:              {r2_score(trian,                trainPredictions):.{accuracy}f}')
             explain('An average of how far off we are from just using the mean as a prediction. Larger is better.')
 fullTest = evaluate
 
