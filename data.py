@@ -920,14 +920,20 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
         raise TypeError(f"Invalid method arguement given")
     return X, y
 
-def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explain=False):
+def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explain=False, compact=False):
+    """ Evaluate your predictions of an ML model.
+        NOTE: compact overrides explain and accuracy.
+     """
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
 
     def _score(name, func, explaination, _test=True, **kwargs):
         name += ':'
-        print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
-        if explain:
-            print('\t\t' + s)
+        if compact:
+            print(f'{name} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.2f}', end='   ')
+        else:
+            print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
+            if explain:
+                print('\t\t' + s)
 
     def _catagorical(_test=True):
         _score('F1',        sk.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
