@@ -25,7 +25,5 @@
 - A function that does a bunch of math and returns a suggested clean config
 
 # Clean
-- Make add column a list so we can do it more than once
 
 # Resample
-- It should work, but I haven't tested it yet

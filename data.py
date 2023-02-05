@@ -922,64 +922,66 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
 
 def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explain=False):
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
-    explain = lambda s: print('\t\t' + s) if explain else None
+
+    def _score(name, func, explaination, _test=True, **kwargs):
+        name += ':'
+        print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
+        if explain:
+            print('\t\t' + s)
+
+    def _catagorical(_test=True):
+        _score('F1',        sk.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
+        _score('Accuracy',  sk.metrics.accuracy_score,  'Accuracy is a measure of how well the model did on average',                    _test)
+        _score('Precision', sk.metrics.precision_score, 'Precision is a measure of how many things we said were true and we were wrong', _test)
+        _score('Recall',    sk.metrics.recall_score,    'Recall is a measure of how many things we missed out on',                       _test)
+
+    def _quantatative(_test=True):
+        _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test)
+        _score('My own measure',         mean_squared_error,  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.',                     _test)
+        _score('Mean Absolute Error',    mean_absolute_error, 'Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.',             _test)
+        _score('R^2 Score',              r2_score,            'An average of how far off we are from just using the mean as a prediction. Larger is better.',          _test)
+
+    # Catagorical measures
     if isinstance(testPredictions[0].dtype, _catagoricalTypes):
         print('Test:')
-        print(f'\tF1:        {sk.metrics.f1_score(test,        testPredictions):,.{accuracy}f}')
-        explain('F1 is essentially an averaged score combining precision and recall')
-        print(f'\tAccuracy:  {sk.metrics.accuracy_score(test,  testPredictions):,.{accuracy}f}')
-        explain('Accuracy is a measure of how well the model did on average')
-        print(f'\tPrecision: {sk.metrics.precision_score(test, testPredictions):,.{accuracy}f}')
-        explain('Precision is a measure of how many things we said were true and we were wrong')
-        print(f'\tRecall:    {sk.metrics.recall_score(test,    testPredictions):,.{accuracy}f}')
-        explain('Recall is a measure of how many things we missed out on')
+        _catagorical()
+
         if confusion:
             ConfusionMatrixDisplay.from_predictions(test, testPredictions, cmap='Blues')
+            plt.show()
         if curve:
             PrecisionRecallDisplay.from_predictions(test, testPredictions)
-        plt.show()
+            plt.show()
 
         if train is not None and trainPredictions is not None:
             print('Train:')
-            print(f'\tF1:        {sk.metrics.f1_score(train,        trainPredictions):,.{accuracy}f}')
-            explain('F1 is essentially an averaged score combining precision and recall')
-            print(f'\tAccuracy:  {sk.metrics.accuracy_score(train,  trainPredictions):,.{accuracy}f}')
-            explain('Accuracy is a measure of how well the model did on average')
-            print(f'\tPrecision: {sk.metrics.precision_score(train, trainPredictions):,.{accuracy}f}')
-            explain('Precision is a measure of how many samples we accurately predicted?')
-            print(f'\tRecall:    {sk.metrics.recall_score(train,    trainPredictions):,.{accuracy}f}')
-            explain('Recall is a measure of how many times we accurately predicted a specific condition')
+            _catagorical(False)
+
+
         if confusion:
             ConfusionMatrixDisplay.from_predictions(train, trainPredictions, cmap='Blues')
+            plt.show()
         if curve:
             PrecisionRecallDisplay.from_predictions(train, trainPredictions)
-        plt.show()
-
+            plt.show()
     # Quantative measures
     else:
         print('Test:')
-        # print(f'\tMean Square Error:      {mean_squared_error(test,      testPredictions):,.{accuracy}f}')
-        print(f'\tRoot Mean Square Error: {mean_squared_error(test, testPredictions, squared=False):,.{accuracy}f}')
-        explain('An average of how far off we are from the target, in the same units as the target. Smaller is better.')
-        print(f'\tMy own measure:         {mean_squared_error(test, testPredictions, squared=False) / test.mean():,.{accuracy}f}')
-        explain('Root mean square / average value. Eliminates the domain a bit. Smaller is better.')
-        print(f'\tMean Absolute Error:    {mean_absolute_error(test,     testPredictions):,.{accuracy}f}')
-        explain('Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.')
-        print(f'\tR^2 Score:              {r2_score(test,                testPredictions):,.{accuracy}f}')
-        explain('An average of how far off we are from just using the mean as a prediction. Larger is better.')
-
+        _quantatative()
         if train is not None and trainPredictions is not None:
             print('Train:')
-            # print(f'\tMean Square Error:      {mean_squared_error(train,      trainPredictions):,.{accuracy}f}')
-            print(f'\tRoot Mean Square Error: {mean_squared_error(train, trainPredictions, squared=False):,.{accuracy}f}')
-            explain('An average of how far off we are from the target, in the same units as the target. Smaller is better.')
-            print(f'\tMy own measure:         {mean_squared_error(test, testPredictions, squared=False) / test.mean():,.{accuracy}f}')
-            explain('Root mean square / average value. Eliminates the domain a bit. Smaller is better.')
-            print(f'\tMean Absolute Error:    {mean_absolute_error(train,     trainPredictions):,.{accuracy}f}')
-            explain('Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.')
-            print(f'\tR^2 Score:              {r2_score(train,                trainPredictions):,.{accuracy}f}')
-            explain('An average of how far off we are from just using the mean as a prediction. Larger is better.')
+            _quantatative(False)
 fullTest = evaluate
 
-def importances():
-    todo()
+def importances(tree, names=None):
+    if names is None:
+        names = tree.feature_names_in_
+    df = pd.DataFrame({
+        'feature': names,
+        'importance': tree.feature_importances_
+    })
+
+    df = df.assign(best=df.importance > .05)
+    df = df.sort_values(by='importance', ascending=False, axis=0)
+    sns.catplot(data=df, x='importance', y='feature', kind='bar', height=10, aspect=2)
+    plt.show()
