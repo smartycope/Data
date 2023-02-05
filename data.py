@@ -922,14 +922,14 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
 
 def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explain=False, compact=False):
     """ Evaluate your predictions of an ML model.
-        NOTE: compact overrides explain and accuracy.
+        NOTE: compact overrides explain.
      """
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
 
     def _score(name, func, explaination, _test=True, **kwargs):
         name += ':'
         if compact:
-            print(f'{name} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.2f}', end='   ')
+            print(f'{name} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}', end='   ')
         else:
             print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
             if explain:
@@ -960,7 +960,7 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
             plt.show()
 
         if train is not None and trainPredictions is not None:
-            print('Train:')
+            print('\nTrain:')
             _catagorical(False)
 
 
@@ -975,7 +975,7 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
         print('Test:')
         _quantatative()
         if train is not None and trainPredictions is not None:
-            print('Train:')
+            print('\nTrain:')
             _quantatative(False)
 fullTest = evaluate
 
