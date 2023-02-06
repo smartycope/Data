@@ -936,14 +936,19 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
                 print('\t\t' + s)
 
     def _catagorical(_test=True):
+            print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
+            if explain:
+                print('\t\t' + s)
+
+    def _catagorical(_test=True):
         _score('F1',        sk.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
         _score('Accuracy',  sk.metrics.accuracy_score,  'Accuracy is a measure of how well the model did on average',                    _test)
         _score('Precision', sk.metrics.precision_score, 'Precision is a measure of how many things we said were true and we were wrong', _test)
         _score('Recall',    sk.metrics.recall_score,    'Recall is a measure of how many things we missed out on',                       _test)
 
     def _quantatative(_test=True):
-        _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test)
-        _score('My own measure',         mean_squared_error,  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.',                     _test)
+        _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test, squared=False)
+        _score('My own measure',         lambda a, b, **k: mean_squared_error(*a, **k) / a.mean(),  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.', _test, squared=False)
         _score('Mean Absolute Error',    mean_absolute_error, 'Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.',             _test)
         _score('R^2 Score',              r2_score,            'An average of how far off we are from just using the mean as a prediction. Larger is better.',          _test)
 
