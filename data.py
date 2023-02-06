@@ -955,12 +955,12 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
         else:
             print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
             if explain:
-                print('\t\t' + s)
+                print('\t\t' + explaination)
 
     def _catagorical(_test=True):
             print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
             if explain:
-                print('\t\t' + s)
+                print('\t\t' + explaination)
 
     def _catagorical(_test=True):
         _score('F1',        sk.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
