@@ -34,8 +34,11 @@ ALERT_MISSING = .55
 # If the difference between the extreme and the mid extreme > median * this, then it indicates outliers
 OUTLIER_THRESHOLD = .5
 
-# np.object_ is a string type (apparently)
-_catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')), bool, np.bool_, np.bool8)
+# For use with DataFrame.select_dtypes(include=/exclude=)
+# _catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')), bool, np.bool_, np.bool8)
+_catagoricalTypes = ['bool', 'bool_', 'object', 'object_', 'Interval', 'bool8', 'category']
+_quantitativeTypes = ['number']
+_timeTypes = ['datetimetz', 'timedelta', 'datetime']
 
 try:
     from Cope import todo
@@ -73,35 +76,23 @@ def isiterable(obj, includeStr=False):
 def sort_dict_by_value_length(d):
     return dict(sorted(d.items(), key=lambda item: len(item[1])))
 
-def isQuantatative(s: pd.Series):
-    return not isCatagorical(s)
+def timeFeatures(df):
+    return df.select_dtypes(include=_timeTypes)
 
-def isCatagorical(s: pd.Series):
-    # This is a total hack, but I'm out of ideas                        \/
-    return len(s) and (isinstance(s[0], _catagoricalTypes) or str(s.dtype) == 'object')
+def catagorical(df, time=False):
+    return df.select_dtypes(include=_catagoricalTypes + (_timeTypes if time else []))
 
-def splitDataFrameTypes(df, outOf=None):
-    cat = []
-    quant = []
+def quantitative(df, time=True):
+    return df.select_dtypes(include=_quantitativeTypes + (_timeTypes if time else []))
 
-    if outOf is None:
-        outOf = list(df.columns)
-    else:
-        ensureIterable(outOf)
+def isTimeFeature(s: pd.Series):
+    return s.name in timeFeatures(pd.DataFrame(s))
 
-    for col in outOf:
-        if isCatagorical(df[col]):
-            cat.append(col)
-        else:
-            quant.append(col)
+def isCatagorical(s: pd.Series, time=False):
+    return s.name in catagorical(pd.DataFrame(s), time)
 
-    return cat, quant
-
-def catagorical(df, outOf=None):
-    return splitDataFrameTypes(df, outOf)[0]
-
-def quantatative(df, outOf=None):
-    return splitDataFrameTypes(df, outOf)[1]
+def isQuantatative(s: pd.Series, time=True):
+    return s.name in quantitative(pd.DataFrame(s), time)
 
 def missingSummary(df, thresh=.6):
     table = df.isnull().sum()/len(df)
@@ -136,33 +127,18 @@ def significantCorrelations(df, thresh=.5):
     return rtn
 
 def getNiceTypesTable(df, types=None):
-    niceTypeNames = {
-        np.object_: 'C',
-        np.dtype('O'): 'C',
-        np.int64: 'Q',
-        np.dtype('int64'): 'Q',
-        np.dtype('float64'): 'Q',
-        pd.CategoricalDtype: 'C',
-        pd.Interval: 'C',
-        pd.IntervalDtype: 'C',
-    }
-    # return pd.DataFrame(dict(zip(df.columns, [(['C'] if isinstance(df[i].dtype, _catagoricalTypes) else ['Q']) for i in df.columns])))
-    if types is None:
-        return pd.DataFrame(dict(zip(df.columns, [([df[i].dtype, 'C'] if isinstance(df[i].dtype, _catagoricalTypes) else [df[i].dtype, 'Q']) for i in df.columns])))
-    elif types:
-        return pd.DataFrame(dict(zip(df.columns, [[df[i].dtype] for i in df.columns])))
-    else:
-        return pd.DataFrame(dict(zip(df.columns, [(['C'] if isinstance(df[i].dtype, _catagoricalTypes) else ['Q']) for i in df.columns])))
+    def _getLabels(col):
+        if isCatagorical(col):
+            return [col.dtype, 'C']
+        if isQuantatative(col):
+            return [col.dtype, 'Q']
+        if isTimeFeature(col):
+            return [col.dtype, 'T']
 
-def _normalize(df, method='default'):
-    for col in quantatative(df):
-        if method == 'default':
-            df[col] = (df[col]-df[col].mean())/df[col].std()
-        elif method == 'min-max':
-            # display(df[col])
-            df[col] = (df[col]-df[col].min())/(df[col].max()-df[col].min())
-        else:
-            raise TypeError('Invalid method parameter')
+    return pd.DataFrame(dict(zip(
+        df.columns,
+        [_getLabels(df[f]) for f in df.columns]
+    )))
 
 def percentCountPlot(data, feature, target=None, ax=None, title='Percentage of values used in {}'):
     # plt.figure(figsize=(20,10))
@@ -211,9 +187,7 @@ def pretty_counts(s:pd.Series):
 
 # The main functions
 def explore(data,
-            relevant=None,
             target=None,
-            notRelevant=None,
             stats=None,
             additionalStats=[],
             missing=True,
@@ -223,40 +197,22 @@ def explore(data,
             startFeature=None,
     ):
     # Parse params and make sure all the params are valid
-    assert relevant is None or notRelevant is None, 'Please dont specify both relevant and not relevant columns at the same time'
     assert not isinstance(target, (list, tuple)), 'There can only be 1 target feature'
     assert target is None or target in data.columns, f'Target {target} is not one of the features'
     assert startFeature is None or startFeature in data.columns, 'startFeature must be a valid column name'
 
-    if relevant is None:
-        relevant = list(data.columns)
-    if notRelevant is not None:
-        for i in ensureIterable(notRelevant):
-            assert i in data.columns, f'{i} is not one of the features'
-            relevant.remove(i)
     if stats is None:
         stats = ['mean', 'median', 'std', 'min', 'max']
     if stats:
         stats += ensureIterable(additionalStats, True)
-    relevant = list(relevant)
-    for i in relevant:
-        assert i in data.columns, f'{i} is not one of the features'
     if startFeature is None:
         if target is not None:
             startFeature = target
         else:
             startFeature = data.columns[0]
 
+
     # Define variables
-    _relevant = data[relevant]
-    quant = data[quantatative(data, relevant)]
-    cat = data[catagorical(data, relevant)]
-    # Just to make sure we're catching all the columns
-    # Convert to set so order doesn't matter
-    assert set(quantatative(data, relevant) + catagorical(data, relevant)) == set(relevant)
-    # Okay, so we have corr here, and we *should* have it in the output() function,
-    # but for SOME REASON it and missing aren't in that scope. They have all the
-    # OTHER parameters, just not corr and missing. Somehow. SOMEHOW????
     whatTheHeck = (corr, missing)
     max_name_len = len(max(data.columns, key=len))
 
@@ -327,10 +283,10 @@ def explore(data,
                 print('which have types:')
                 display(getNiceTypesTable(data))
 
-                if len(quant):
+                if len(quantitative(data)):
                     print('\nThe possible values for the Catagorical values:')
                     # This is just an overly complicated way to print them all nicely
-                    for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in cat])).items():
+                    for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in catagorical(data)])).items():
                         # If it has too high of a cardinality, just print the first few
                         card = len(value)
                         shortened = False
@@ -348,9 +304,9 @@ def explore(data,
                         if shortened:
                             print(f'... ({card - 29} more catagories)')
         elif page == 'Stats':
-                if len(quant):
+                if len(quantitative(data)):
                     # print('Summary of Quantatative Values:')
-                    display(_relevant.agg(dict(zip(quant, [stats]*len(relevant)))))
+                    display(data.agg(dict(zip(quantitative(data), [stats]*len(data.columns)))))
         elif page == 'Entropy':
                 todo('Calculate entropy relative to the target feature')
                 # if target is not None:
@@ -366,7 +322,7 @@ def explore(data,
                 display(data.head())
         elif page == 'Counts':
                 # This is sorted just so the features with less unique options go first
-                for i in sorted(cat, key=lambda c: len(data[c].unique())):
+                for i in sorted(catagorical(data), key=lambda c: len(data[c].unique())):
                     print(f'{i} value counts:')
 
                     if len(data[i].unique()) == len(data[i]):
@@ -374,15 +330,15 @@ def explore(data,
                     else:
                         print(pretty_counts(data[i]))
         elif page == 'Correlations':
-                if len(quant):
+                if len(quantitative(data)):
                     print('Correlations Between Quantatative Values:')
                     if type(corr) is bool:
-                        display(quant.corr())
+                        display(quantitative(data).corr())
                     elif isinstance(corr, (int, float)):
                         corr = normalizePercentage(corr)
                         # Ignore if they're looking for a negative correlation, just get both
                         corr = abs(corr)
-                        _corr = significantCorrelations(quant, corr)
+                        _corr = significantCorrelations(quantitative(data), corr)
                         if len(_corr):
                             a_len = max([len(i[0]) for i in _corr])
                             b_len = max([len(i[1]) for i in _corr])
@@ -391,22 +347,22 @@ def explore(data,
                         else:
                             print(f'\tThere are no correlations greater than {corr:.0%}')
         elif page == 'Missing':
-                if len(_relevant):
-                    print('Missing Percentages:')
-                    if type(missing) is bool:
-                        percent = _relevant.isnull().sum()/len(_relevant)*100
-                        # This works, but instead I decided to overcomplicate it just so I can indent it
-                        # print(percent)
-                        print(pretty_2_column_array(percent))
-                    elif isinstance(missing, (int, float)):
-                        missing = normalizePercentage(missing)
-                        _missing = missingSummary(_relevant, missing/100)
-                        if len(_missing):
-                            display(_missing)
-                        else:
-                            print(f'\tAll values are missing less than {missing:.0%} of their entries')
+                # if len(_relevant):
+                print('Missing Percentages:')
+                if type(missing) is bool:
+                    percent = data.isnull().sum()/len(data)*100
+                    # This works, but instead I decided to overcomplicate it just so I can indent it
+                    # print(percent)
+                    print(pretty_2_column_array(percent))
+                elif isinstance(missing, (int, float)):
+                    missing = normalizePercentage(missing)
+                    _missing = missingSummary(data, missing/100)
+                    if len(_missing):
+                        display(_missing)
                     else:
-                        raise TypeError('Missing is a bad type')
+                        print(f'\tAll values are missing less than {missing:.0%} of their entries')
+                else:
+                    raise TypeError('Missing is a bad type')
         elif page == 'Features':
                 # TODO: mode[s], std, quantative entropy, catagorical correlations, data.groupby(feature)[target].value_counts(),
                 featureBox.layout.visibility = 'visible'
@@ -430,7 +386,7 @@ def explore(data,
                 # Quantative description
                 else:
                     correlations = []
-                    for a, b, c in significantCorrelations(quant, corr):
+                    for a, b, c in significantCorrelations(quantitative(data), corr):
                         other = None
                         if a == feature:
                             other = b
@@ -460,11 +416,11 @@ def explore(data,
                 print()
                 todo('Add nice plots here: scatterplots, histograms, and relating to the target feature')
         elif page == 'General Plots':
-                if len(quant):
+                if len(quantitative(data)):
                     print('Plot of Quantatative Values:')
-                    sns.catplot(data=quant)
+                    sns.catplot(data=quantitative(data))
                     plt.show()
-                if len(cat):
+                if len(catagorical(data)):
                     print('Plot of Catagorical Value Counts:')
                     todo('catagorical (count?) plots')
                     # plt.show()
@@ -486,12 +442,12 @@ def explore(data,
 
                 plt.show()
         elif page == 'Matrix':
-                if len(quant):
+                if len(quantitative(data)):
                     print('Something Something Matrix:')
-                    if target in quantatative(data, relevant):
-                        sns.pairplot(data=quant, hue=target)
+                    if target in quantitative(data):
+                        sns.pairplot(data=quantitative(data), hue=target)
                     else:
-                        sns.pairplot(data=quant)
+                        sns.pairplot(data=quantitative(data))
                     plt.show()
         elif page == 'Alerts':
                 # TODO:
@@ -499,13 +455,14 @@ def explore(data,
                 # check that relative entropy isn't too low
                 # check for spikes and plummets
                 # high correlations between features
+                # Print the kurtosis score with the outlier stuff
 
                 # Check if our dataset is small
                 if data[feature].count() < SMALL_DATASET:
                     print(f"Your dataset isn't very large ({data[feature].count()}<{SMALL_DATASET})")
 
                 # Check the cardinality
-                for c in cat:
+                for c in catagorical(data):
                     card = len(data[c].unique())
                     if card == 1:
                         print(f'All values in feature "{c}" are the same')
@@ -521,7 +478,7 @@ def explore(data,
                         print(f'Feature {i} is missing a significant portion ({miss}>={ALERT_MISSING})')
 
                 # Check for outliers
-                for q in quant:
+                for q in quantitative(data):
                     try:
                         upper = data[q].max() - data[q].quantile(.75)
                         upperMid = data[q].quantile(.75) - data[q].median()
@@ -800,7 +757,8 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                     else:
                         raise TypeError('Invalid normalize argument given')
             elif op == 'convert_numeric':
-                if isQuantatative(df[column]):
+                # We *do* want to convert numbers by defualt
+                if isQuantatative(df[column], time=False):
                     if not ignoreWarnings:
                         warn(f'The conver_numeric option was set on {column}, which is not catagorical, skipping.')
                         continue
@@ -957,10 +915,10 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
             if explain:
                 print('\t\t' + explaination)
 
-    def _catagorical(_test=True):
-            print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
-            if explain:
-                print('\t\t' + explaination)
+    # def _catagorical(_test=True):
+    #         print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
+    #         if explain:
+    #             print('\t\t' + explaination)
 
     def _catagorical(_test=True):
         _score('F1',        sk.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)

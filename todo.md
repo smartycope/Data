@@ -20,6 +20,7 @@
     - check that relative entropy isn't too low
     - check for spikes and plummets
     - high correlations between features
+    - kurtosis value being too high/low
 
 # SuggestedCleaning
 - A function that does a bunch of math and returns a suggested clean config
