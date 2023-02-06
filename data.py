@@ -6,7 +6,9 @@ import random
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from math import sqrt
 import seaborn as sns
-from scipy.stats import entropy as _entropy
+# from scipy.stats import entropy as _entropy
+# from scipy.stats import kurtosis
+import scipy.stats
 import matplotlib.pyplot as plt
 from typing import Optional, Any, Tuple, List, Iterable, Dict, Union
 import numpy as np
@@ -354,7 +356,7 @@ def explore(data,
                 # if target is not None:
                 # base = e if entropy is not None else entropy
                 for c in data.columns:
-                    print(f'The entropy of {c:>{max_name_len}} is: {round(_entropy(data[c].value_counts(normalize=True), base=entropy), 3)}')
+                    print(f'The entropy of {c:>{max_name_len}} is: {round(scipy.stats.entropy(data[c].value_counts(normalize=True), base=entropy), 3)}')
                     # print(f'The entropy of {c} is: {entropy(data[c], data[target])}')
                 # else:
                     # print('Target feature must be provided in order to calculate the entropy')
@@ -418,7 +420,7 @@ def explore(data,
                 # Catagorical description
                 if isCatagorical(data[feature]):
                     print(shared)
-                    print(f'It has an entropy of {_entropy(data[feature].value_counts(normalize=True), base=entropy):.3f}', end=', ')
+                    print(f'It has an entropy of {scipy.stats.entropy(data[feature].value_counts(normalize=True), base=entropy):.3f}', end=', ')
                     print(f'and a cardinaltiy of {len(data[feature].unique())}')
                     print('Value counts:')
                     print(pretty_counts(data[feature]))
@@ -444,6 +446,11 @@ def explore(data,
 
                     print(shared)
                     print(f'It has an average value of {data[feature].mean():,.2f}, and a median of {data[feature].median():,.2f}.')
+                    # Because dates are weird
+                    try:
+                        print(f'It has a kurtosis value of {scipy.stats.kurtosis(data[feature]):,.2f}.')
+                        print(f'\tNegative values mean less outliers than a normal distrobution, positive values mean more.')
+                    except np.core._exceptions.UFuncTypeError: pass
                     print(f'It has a minimum value of {data[feature].min():,.2f}, and a maximum value of {data[feature].max():,.2f}.')
                     print(correlations)
 
@@ -558,6 +565,19 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                     warn('drop_duplicates hasnt been implemented yet for induvidual columns. What are you trying to do?')
                     # log(f'Dropping duplicates in {column}')
                     # df[column].drop_duplicates(inplace=True)
+            elif op == 'handle_outliers':
+                warn('handle_outliers is untested')
+                zscore, method = options
+                if options != False:
+                    samples = df[column][np.abs(scipy.stats.zscore(df[column])) < zscore]
+                    if method == 'remove':
+                        df = df.drop(samples.index)
+                    elif method == 'constrain':
+                        # The value that corresponds to a given score is the standard deviate * zscore
+                        max = df[column].std() * zscore
+                        df.loc[samples.index, column] = np.clip(samples, -max, max)
+                    else:
+                        raise TypeError(f"Invalid handle_outliers arguement '{method}' given")
             elif op == 'replace':
                 if options == True:
                     if not ignoreWarnings:
@@ -833,6 +853,8 @@ def clean(df:pd.DataFrame,
                         # Drop duplicate samples
                         # Only applies to all
                         'drop_duplicates': bool,
+                        # Removes samples which have a Z-score magnitude of greater than this value
+                        'handle_outliers': Union[bool, Tuple[float, Union['remove', 'constrain']],
                         # Maps feature values to a dictionary
                         'replace': Union[bool, Dict],
                         # Applies a function to the column
@@ -984,7 +1006,7 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
             _quantatative(False)
 fullTest = evaluate
 
-def importances(tree, names=None):
+def importances(tree, names=None, rtn=False):
     if names is None:
         names = tree.feature_names_in_
     df = pd.DataFrame({
@@ -996,3 +1018,6 @@ def importances(tree, names=None):
     df = df.sort_values(by='importance', ascending=False, axis=0)
     sns.catplot(data=df, x='importance', y='feature', kind='bar', height=10, aspect=2)
     plt.show()
+
+    if rtn:
+        return df
