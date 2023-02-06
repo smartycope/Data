@@ -33,6 +33,8 @@ HIGH_CARDINALITY = 50
 ALERT_MISSING = .55
 # If the difference between the extreme and the mid extreme > median * this, then it indicates outliers
 OUTLIER_THRESHOLD = .5
+# This is an option for the zscore slider in explore(). Turning it on is fancier, but it's really slow
+CONTINUOUS_UPDATE_SLIDER = False
 
 # For use with DataFrame.select_dtypes(include=/exclude=)
 # _catagoricalTypes = (str, Enum, np.object_, pd.CategoricalDtype, pd.Interval, pd.IntervalDtype, type(np.dtype('O')), bool, np.bool_, np.bool8)
@@ -128,9 +130,9 @@ def significantCorrelations(df, thresh=.5):
 
 def getNiceTypesTable(df, types=None):
     def _getLabels(col):
-        if isCatagorical(col):
+        if isCatagorical(col, time=False):
             return [col.dtype, 'C']
-        if isQuantatative(col):
+        if isQuantatative(col, time=False):
             return [col.dtype, 'Q']
         if isTimeFeature(col):
             return [col.dtype, 'T']
@@ -183,6 +185,24 @@ def pretty_counts(s:pd.Series):
     # rtn = str()
     rtn = pretty_2_column_array(s.value_counts(normalize=True, sort=True))
     return rtn
+
+
+def showOutliers(data, column, zscore):
+    if isCatagorical(data[column]):
+        raise TypeError('Outliers only apply to quantitative values')
+    samples = data[column][np.abs(scipy.stats.zscore(data[column])) > zscore]
+    print(len(samples), len(data[column]), sep='/')
+    sns.scatterplot(data=data[column])
+    sns.scatterplot(data=samples)
+    plt.show()
+
+def interactWithOutliers(df, feature=None, step=.2):
+    return widgets.interactive(showOutliers,
+        data=widgets.fixed(df),
+        column=list(df.columns) if feature is None else widgets.fixed(feature),
+        zscore=(0., df[feature].max() / df[feature].std(), step) if feature is not None else (0., 10, step)
+        # zscore=(0., 20, step)
+    )
 
 
 # The main functions
@@ -263,14 +283,28 @@ def explore(data,
                     description='y',
         )
     featureBBox.layout.visibility = 'hidden'
+    outlierSlider = widgets.FloatSlider(
+        value=3,
+        min=0.,
+        max=10.,
+        step=0.1,
+        description='Z-Score:',
+        # disabled=False,
+        continuous_update=CONTINUOUS_UPDATE_SLIDER,
+        # orientation='horizontal',
+        # readout=True,
+        # readout_format='.1f',
+    )
+    outlierSlider.layout.visibility = 'hidden'
 
     # All the actual logic
-    def output(page, feature, a, b):
+    def output(page, feature, a, b, zscore):
         # See baffled comment above
         corr, missing = whatTheHeck
         featureBox.layout.visibility = 'hidden'
         featureABox.layout.visibility = 'hidden'
         featureBBox.layout.visibility = 'hidden'
+        outlierSlider.layout.visibility = 'hidden'
         # Clear the output (because colab doesn't automatically or something?)
         clear_output(wait=True)
 
@@ -385,6 +419,12 @@ def explore(data,
 
                 # Quantative description
                 else:
+                    # Set the slider variables
+                    outlierSlider.layout.visibility = 'visible'
+                    outlierSlider.max = data[feature].max() / data[feature].std()
+                    # Start at max so we include everything at first and it's just a normal graph
+                    # outlierSlider.value = data[feature].max() / data[feature].std()
+
                     correlations = []
                     for a, b, c in significantCorrelations(quantitative(data), corr):
                         other = None
@@ -410,11 +450,22 @@ def explore(data,
                     print(f'It has a minimum value of {data[feature].min():,.2f}, and a maximum value of {data[feature].max():,.2f}.')
                     print(correlations)
 
-                    sns.scatterplot(data=data[feature])
-                    plt.show()
+                    # sns.scatterplot(data=data[feature])
+                    # plt.show()
+                    # display(interactWithOutliers(data, feature))
+
+                    # def interactWithOutliers(df, feature=None, step=.2):
+                    # widgets.interactive(
+                    print()
+                    showOutliers(data, feature, zscore)
+                        # data=widgets.fixed(df),
+                        # column=list(df.columns) if feature is None else widgets.fixed(feature),
+                        # zscore=(0., df[feature].max() / df[feature].std(), step) if feature is not None else (0., 10, step)
+                        # zscore=(0., 20, step)
+                    # )
 
                 print()
-                todo('Add nice plots here: scatterplots, histograms, and relating to the target feature')
+                # todo('Add nice plots here: scatterplots, histograms, and relating to the target feature')
         elif page == 'General Plots':
                 if len(quantitative(data)):
                     print('Plot of Quantatative Values:')
@@ -497,13 +548,13 @@ def explore(data,
                 print('Invalid start option')
 
     # widgets.interact(output, page=combobox, feature=featureBox)
-    ui = widgets.GridBox([combobox, featureABox, featureBox, featureBBox], layout=widgets.Layout(
+    ui = widgets.GridBox([combobox, featureABox, featureBox, featureBBox, outlierSlider], layout=widgets.Layout(
                 grid_template_columns='auto auto',
                 grid_row_gap='10px',
                 grid_column_gap='100px',
             )
        )
-    out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox})
+    out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox, 'zscore': outlierSlider})
     display(ui, out)
 quickSummary = explore
 
@@ -517,16 +568,16 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
     # We're allowing column to be None for the specific case of add_column (which doesn't require a column)
     if column in df.columns or column is None:
         for op, options in args.items():
-            if op == 'drop_duplicates':
+            if   op == 'drop_duplicates':
                 if options:
                     warn('drop_duplicates hasnt been implemented yet for induvidual columns. What are you trying to do?')
                     # log(f'Dropping duplicates in {column}')
                     # df[column].drop_duplicates(inplace=True)
             elif op == 'handle_outliers':
-                warn('handle_outliers is untested')
+                # warn('handle_outliers is untested')
                 zscore, method = options
                 if options != False:
-                    samples = df[column][np.abs(scipy.stats.zscore(df[column])) < zscore]
+                    samples = df[column][np.abs(scipy.stats.zscore(df[column])) > zscore]
                     if method == 'remove':
                         df = df.drop(samples.index)
                     elif method == 'constrain':
