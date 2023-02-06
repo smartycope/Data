@@ -948,7 +948,7 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
 
     def _quantatative(_test=True):
         _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test, squared=False)
-        _score('My own measure',         lambda a, b, **k: mean_squared_error(*a, **k) / a.mean(),  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.', _test, squared=False)
+        _score('My own measure',         lambda a, b, **k: mean_squared_error(a, b, **k) / a.mean(),  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.', _test, squared=False)
         _score('Mean Absolute Error',    mean_absolute_error, 'Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.',             _test)
         _score('R^2 Score',              r2_score,            'An average of how far off we are from just using the mean as a prediction. Larger is better.',          _test)
 
