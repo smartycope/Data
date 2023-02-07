@@ -989,7 +989,7 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
         _score('R^2 Score',              r2_score,            'An average of how far off we are from just using the mean as a prediction. Larger is better.',          _test)
 
     # Catagorical measures
-    if isCatagorical(testPredictions[0]):
+    if isCatagorical(testPredictions):
         print('Test:')
         _catagorical()
 
