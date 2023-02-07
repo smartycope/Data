@@ -323,7 +323,7 @@ def explore(data,
                 if len(quantitative(data)):
                     print('\nThe possible values for the Catagorical values:')
                     # This is just an overly complicated way to print them all nicely
-                    for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in catagorical(data)])).items():
+                    for key, value in sort_dict_by_value_length(dict([(c, data[c].unique()) for c in catagorical(data).columns])).items():
                         # If it has too high of a cardinality, just print the first few
                         card = len(value)
                         shortened = False
@@ -424,7 +424,8 @@ def explore(data,
                 else:
                     # Set the slider variables
                     outlierSlider.layout.visibility = 'visible'
-                    # todo This is usable, but can definitely be improved
+                    # Todo This breaks on time data (I think)
+                    # Todo This is usable, but can definitely be improved
                     if data[feature].std() > 1:
                         outlierSlider.max = abs(data[feature].max()) / data[feature].std()
                     else:
