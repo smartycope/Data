@@ -421,9 +421,11 @@ def explore(data,
                 else:
                     # Set the slider variables
                     outlierSlider.layout.visibility = 'visible'
-                    outlierSlider.max = data[feature].max() / data[feature].std()
-                    # Start at max so we include everything at first and it's just a normal graph
-                    # outlierSlider.value = data[feature].max() / data[feature].std()
+                    # todo This is usable, but can definitely be improved
+                    if data[feature].std() > 1:
+                        outlierSlider.max = abs(data[feature].max()) / data[feature].std()
+                    else:
+                        outlierSlider.max = abs(data[feature].max()) * data[feature].std()
 
                     correlations = []
                     for a, b, c in significantCorrelations(quantitative(data), corr):
@@ -581,8 +583,11 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
                     if method == 'remove':
                         df = df.drop(samples.index)
                     elif method == 'constrain':
+                        todo('Breaks on negative values')
+                        # todo try optionally getting everything *not* in range instead of just the things in rang
                         # The value that corresponds to a given score is the standard deviate * zscore
                         max = df[column].std() * zscore
+                        # df.loc[samples.index, column] = np.clip(samples, -max, max)
                         df.loc[samples.index, column] = np.clip(samples, -max, max)
                     else:
                         raise TypeError(f"Invalid handle_outliers arguement '{method}' given")
