@@ -1,5 +1,6 @@
 import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
+from contextlib import redirect_stdout
 from imblearn.under_sampling import RandomUnderSampler
 from warnings import warn
 import random
@@ -1024,7 +1025,7 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
             _quantatative(False)
 fullTest = evaluate
 
-def importances(tree, names=None, rtn=False):
+def importances(tree, names=None, rtn=False, graph=True):
     if names is None:
         names = tree.feature_names_in_
     df = pd.DataFrame({
@@ -1034,8 +1035,20 @@ def importances(tree, names=None, rtn=False):
 
     df = df.assign(best=df.importance > .05)
     df = df.sort_values(by='importance', ascending=False, axis=0)
-    sns.catplot(data=df, x='importance', y='feature', kind='bar', height=10, aspect=2)
-    plt.show()
+    if graph:
+        sns.catplot(data=df, x='importance', y='feature', kind='bar', height=10, aspect=2)
+        plt.show()
 
     if rtn:
         return df
+
+def saveStats(name, model, testY, predY, trainY=None, trainPredY=None, new=False, show=True):
+    def doit():
+        print(importances(model, rtn=True, graph=False))
+        evaluate(testY, predY, trainPredY, trainY, compact=True)
+
+    with open(name + '.txt', 'w' if new else 'a') as f:
+        with redirect_stdout(f):
+            doit()
+    if show:
+        doit()
