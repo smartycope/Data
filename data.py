@@ -88,15 +88,15 @@ def quantitative(df, time=True):
     return df.select_dtypes(include=_quantitativeTypes + (_timeTypes if time else []))
 
 def isTimeFeature(s: pd.Series):
-    s = pd.Series(s, '__dummy')
+    s = pd.Series(s, name='__dummy')
     return s.name in timeFeatures(pd.DataFrame(s))
 
 def isCatagorical(s: pd.Series, time=False):
-    s = pd.Series(s, '__dummy')
+    s = pd.Series(s, name='__dummy')
     return s.name in catagorical(pd.DataFrame(s), time)
 
 def isQuantatative(s: pd.Series, time=True):
-    s = pd.Series(s, '__dummy')
+    s = pd.Series(s, name='__dummy')
     return s.name in quantitative(pd.DataFrame(s), time)
 
 def missingSummary(df, thresh=.6):
