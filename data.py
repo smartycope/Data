@@ -443,7 +443,10 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
             df[col] = column
             return (df, assings) if returnAssignments else df
     elif method == 'one_hot_encode':
-        log(f'Converting "{df.name}" to quantatative by one hot encoding', verbose)
+        if col is not None:
+            log(f'Converting "{df.name}" to quantatative by one hot encoding', verbose)
+        else:
+            log(f'Converting DataFrame to quantatative by one hot encoding', verbose)
         # df = pd.get_dummies(df, columns=[col])
         if col is None:
             col = ensureIterable(col)
