@@ -424,7 +424,7 @@ def normalize(col, method='min-max', verbose=False):
 
 def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='one_hot_encode', returnAssignments=False, verbose=False) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Tuple['assignments']]]:
     df = df.copy()
-    if isinstance(df, pd.Series) and method != 'assign':
+    if isinstance(df, pd.Series) and method == 'assign':
         raise TypeError("A DataFrame and column name is required when using one hot encoding to convert to numeric")
         if isQuantatative(df):
             raise TypeError(f"Series given is already quantatitive")
