@@ -5,6 +5,7 @@ from imblearn.under_sampling import RandomUnderSampler
 from warnings import warn
 import random
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import sklearn
 from math import sqrt
 import seaborn as sns
 # from scipy.stats import entropy as _entropy
