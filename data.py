@@ -1015,7 +1015,7 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
 
-def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explain=False, compact=False):
+def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False):
     """ Evaluate your predictions of an ML model.
         NOTE: compact overrides explain.
      """
@@ -1036,10 +1036,10 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
     #             print('\t\t' + explaination)
 
     def _catagorical(_test=True):
-        _score('F1',        sk.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
-        _score('Accuracy',  sk.metrics.accuracy_score,  'Accuracy is a measure of how well the model did on average',                    _test)
-        _score('Precision', sk.metrics.precision_score, 'Precision is a measure of how many things we said were true and we were wrong', _test)
-        _score('Recall',    sk.metrics.recall_score,    'Recall is a measure of how many things we missed out on',                       _test)
+        _score('F1',        sklearn.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
+        _score('Accuracy',  sklearn.metrics.accuracy_score,  'Accuracy is a measure of how well the model did on average',                    _test)
+        _score('Precision', sklearn.metrics.precision_score, 'Precision is a measure of how many things we said were true and we were wrong', _test)
+        _score('Recall',    sklearn.metrics.recall_score,    'Recall is a measure of how many things we missed out on',                       _test)
 
     def _quantatative(_test=True):
         _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test, squared=False)
