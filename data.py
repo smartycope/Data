@@ -457,7 +457,7 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
         for s in skip:
             col.remove(s)
 
-        if col is not None:
+        if isinstance(col, pd.Series):
             log(f'Converting "{df.name}" to quantatative by one hot encoding', verbose)
         else:
             log(f'Converting DataFrame to quantatative by one hot encoding', verbose)
