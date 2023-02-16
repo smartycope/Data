@@ -99,13 +99,13 @@ def isiterable(obj, includeStr=False):
 def sort_dict_by_value_length(d):
     return dict(sorted(d.items(), key=lambda item: len(item[1])))
 
-def timeFeatures(df):
+def timeFeatures(df) -> pd.DataFrame:
     return df.select_dtypes(include=_timeTypes)
 
-def catagorical(df, time=False):
+def catagorical(df, time=False) -> pd.DataFrame:
     return df.select_dtypes(include=_catagoricalTypes + (_timeTypes if time else []))
 
-def quantitative(df, time=True):
+def quantitative(df, time=True) -> pd.DataFrame:
     return df.select_dtypes(include=_quantitativeTypes + (_timeTypes if time else []))
 
 def isTimeFeature(s: pd.Series):
@@ -422,7 +422,7 @@ def normalize(col, method='min-max', verbose=False):
     else:
         raise TypeError('Invalid method argument given')
 
-def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='one_hot_encode', returnAssignments=False, verbose=False) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Tuple['assignments']]]:
+def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='one_hot_encode', returnAssignments=False, skip=[], verbose=False):
     df = df.copy()
     if isinstance(df, pd.Series) and method == 'assign':
         raise TypeError("A DataFrame and column name is required when using one hot encoding to convert to numeric")
@@ -443,16 +443,26 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
             df[col] = column
             return (df, assings) if returnAssignments else df
     elif method == 'one_hot_encode':
+        # This is all just overly-complicated parameter handling for 1 line of code
+        skip = ensureIterable(skip)
+        if col is not None:
+            col = set(ensureIterable(col))
+        else:
+            if isinstance(df, pd.DataFrame):
+                # col = set(df)
+                col = set(catagorical(df).columns)
+            else:
+                return pd.get_dummies(df)
+
+        for s in skip:
+            col.remove(s)
+
         if col is not None:
             log(f'Converting "{df.name}" to quantatative by one hot encoding', verbose)
         else:
             log(f'Converting DataFrame to quantatative by one hot encoding', verbose)
-        # df = pd.get_dummies(df, columns=[col])
-        if col is not None:
-            col = ensureIterable(col)
-            return pd.get_dummies(df, columns=col)
-        else:
-            return pd.get_dummies(df)
+
+        return pd.get_dummies(df, columns=list(col))
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
@@ -463,7 +473,7 @@ def explore(data,
             stats=None,
             additionalStats=[],
             missing=True,
-            corr=.5,
+            corr=.55,
             entropy=None,
             start='Head',
             startFeature=None,
