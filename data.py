@@ -429,7 +429,7 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
         # if isQuantatative(df):
             # raise TypeError(f"Series given is already quantatitive")
     # else:
-    if (col is not None and isQuantatative(df[col])) or (col is None and isQuantatative(df)):
+    if (col is not None and isQuantatative(df[col])) or (col is None and isisntance(df, pd.Series) and isQuantatative(df)):
         raise TypeError(f"Series given is already quantatitive")
 
     if method == 'assign':
