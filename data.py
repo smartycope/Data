@@ -330,7 +330,7 @@ def handle_missing(col, method:Union[pd.Series, 'remove', 'mean', 'median', 'mod
         return col.copy().mask(col == missing_value, method)
     return col
 
-def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any], verbose=False):
+def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remove', 'new', 'mean', 'median', 'mode', 'random', 'balanced_random', Any], true=1, false=0, verbose=False):
     df = df.copy()
     if isinstance(method, pd.Series):
         log(f'Changing all samples where "{query}" is true to have the {column} values of their indecies in "{method.name}"', verbose)
@@ -371,6 +371,10 @@ def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remov
 
         q = df.query(query)
         df.loc[q.index, column] = q[column].apply(fill)
+    elif method == 'new':
+        q = df.query(query)
+        df[column] = false
+        df.loc[q.index, column] = true
     elif method == 'balanced_random':
         if isCatagorical(df[column]):
             log(f'Setting all samples where "{query}" is true to have evenly distributed random catagories', verbose)
