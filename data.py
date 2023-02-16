@@ -424,13 +424,13 @@ def normalize(col, method='min-max', verbose=False):
 
 def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='one_hot_encode', returnAssignments=False, skip=[], verbose=False):
     df = df.copy()
-    if isinstance(df, pd.Series) and method == 'assign':
-        raise TypeError("A DataFrame and column name is required when using one hot encoding to convert to numeric")
-        if isQuantatative(df):
-            raise TypeError(f"Series given is already quantatitive")
-    else:
-        if col is not None and isQuantatative(df[col]):
-            raise TypeError(f"Series given is already quantatitive")
+    # if isinstance(df, pd.Series) and method == 'one_hot_encode':
+        # raise TypeError("A DataFrame and column name is required when using one hot encoding to convert to numeric")
+        # if isQuantatative(df):
+            # raise TypeError(f"Series given is already quantatitive")
+    # else:
+    if (col is not None and isQuantatative(df[col])) or (col is None and isQuantatative(df)):
+        raise TypeError(f"Series given is already quantatitive")
 
     if method == 'assign':
         log(f'Converting "{col}" to quantatative by assinging to arbitrary values', verbose)
@@ -1006,15 +1006,14 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     # match method:
     if method == 'oversample':
         sampler = RandomOverSampler(random_state=seed)
-        X, y = sampler.fit_resample(X, y)
+        return sampler.fit_resample(X, y)
     elif method == 'undersample':
         sampler = RandomUnderSampler(random_state=seed)
-        X, y = sampler.fit_resample(X, y)
+        return sampler.fit_resample(X, y)
     elif method == 'mixed':
         todo('figure out how to mix under and over sampling')
     else:
         raise TypeError(f"Invalid method arguement given")
-    return X, y
 
 def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=True, explain=False, compact=False):
     """ Evaluate your predictions of an ML model.
