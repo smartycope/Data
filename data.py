@@ -448,7 +448,7 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
         else:
             log(f'Converting DataFrame to quantatative by one hot encoding', verbose)
         # df = pd.get_dummies(df, columns=[col])
-        if col is None:
+        if col is not None:
             col = ensureIterable(col)
             return pd.get_dummies(df, columns=col)
         else:
