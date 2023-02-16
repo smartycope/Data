@@ -1016,7 +1016,7 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
 
-def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False):
+def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False):
     """ Evaluate your predictions of an ML model.
         NOTE: compact overrides explain.
      """
