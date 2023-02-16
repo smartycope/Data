@@ -59,6 +59,26 @@ def ensureIterable(obj, useList=False):
     else:
         return obj
 
+def getOutliers(data, zscore=None):
+    # TODO: add more options here (like getting outliers via kurtosis & IQR)
+    # IQR (inner quartile range) = Q3-Q1
+    # +/- 1.5*IQR == possible outlier
+    # +/- 3*IQR == outlier
+    # kurtosis
+    if isinstance(data, pd.Series):
+        if zscore is not None:
+            return data[np.abs(scipy.stats.zscore(data)) > zscore]
+
+    elif isinstance(data, pd.DataFrame):
+        if zscore is not None:
+            rtn = {}
+            for f in data.columns:
+                rtn[f] = data[f][np.abs(scipy.stats.zscore(data[f])) > zscore]
+            return pd.DataFrame(rtn)
+
+    else:
+        raise TypeError(f"Invalid type {type(data)} given")
+
 def normalizePercentage(p, error='Percentage is of the wrong type (int or float expected)'):
     if isinstance(p, (int, Integer)):
         return p / 100
@@ -170,7 +190,7 @@ def column_entropy(column:pd.Series, base=e):
     vc = pd.Series(column).value_counts(normalize=True, sort=False)
     return -(vc * np.log(vc)/np.log(base)).sum()
 
-def pretty_2_column_array(a, limit=30):
+def pretty_2_column_array(a, limit=30, paren=None):
     card = len(a)
     if card > limit:
         a = a[:limit-1]
@@ -179,22 +199,38 @@ def pretty_2_column_array(a, limit=30):
     offset = max(list(a.index), key=len)
     rtn = ''
     for i in range(len(a)):
-        rtn += f'\t{a.index[i]:>{len(offset)}}: {a[i]:.1%}\n'
+        if paren is None:
+            rtn += f'\t{a.index[i]:>{len(offset)}}: {a[i]:.1%}\n'
+        else:
+            rtn += f'\t{a.index[i]:>{len(offset)}}: {a[i]:.1%} ({paren[i]})\n'
     return rtn
 
-def pretty_counts(s:pd.Series):
+def pretty_counts(s:pd.Series, paren=False):
     # rtn = ''
     # for i in s.value_counts(normalize=True, sort=True):
     #     rtn += str(i)
     # rtn = str()
-    rtn = pretty_2_column_array(s.value_counts(normalize=True, sort=True))
+    if paren:
+        rtn = pretty_2_column_array(s.value_counts(normalize=True, sort=True), paren=s.value_counts(sort=True))
+    else:
+        rtn = pretty_2_column_array(s.value_counts(normalize=True, sort=True))
     return rtn
 
+
+def meanConfInterval(data, confidence=0.95, mean=False):
+    a = 1.0 * np.array(data)
+    n = len(a)
+    m, se = np.mean(a), scipy.stats.sem(a)
+    h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
+    if mean:
+        return m, m-h, m+h
+    else:
+        return m-h, m+h
 
 def showOutliers(data, column, zscore):
     if isCatagorical(data[column]):
         raise TypeError('Outliers only apply to quantitative values')
-    samples = data[column][np.abs(scipy.stats.zscore(data[column])) > zscore]
+    samples = getOutliers(data[column], zscore=zscore)
     print(len(samples), len(data[column]), sep='/')
     sns.scatterplot(data=data[column])
     sns.scatterplot(data=samples)
@@ -207,6 +243,211 @@ def interactWithOutliers(df, feature=None, step=.2):
         zscore=(0., df[feature].max() / df[feature].std(), step) if feature is not None else (0., 10, step)
         # zscore=(0., 20, step)
     )
+
+# Clean Functions
+# DataFrame.drop_duplicates(inplace=True)
+# DataFrame.replace({})
+# DataFrame.apply(func, axis=1)
+    # Series.apply(func)
+#
+log = lambda s, v: print('\t' + s) if v else None
+def handle_outliers(col, method:Union['remove', 'constrain']='remove', zscore=3, verbose=False):
+    # TODO: add more options here (like getting outliers via kurtosis & IQR)
+    samples = getOutliers(col, zscore=zscore)
+    if method == 'remove':
+        log(f'Removing outliers with zscore magnitudes >{zscore} from {col.name}', verbose)
+        return col.drop(samples.index)
+    elif method == 'constrain':
+        todo('This breaks on negative values')
+        # todo try optionally getting everything *not* in range instead of just the things in range
+        # The value that corresponds to a given score is the standard deviate * zscore
+        max = col.std() * zscore
+        # df.loc[samples.index, column] = np.clip(samples, -max, max)
+        log(f'Constraining outliers with zscore magnitudes >{zscore} from {col.name}', verbose)
+        # col[samples.index] = np.clip(samples, -max, max)
+        # col.mask()
+        return col.apply(lambda s: np.clip(s, -max, max))
+    else:
+        raise TypeError(f"Invalid method arguement '{method}' given")
+
+def handle_missing(col, method:Union[pd.Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any], missing_value=np.nan, verbose=False):
+    without = col.loc[col != missing_value]
+    # match options:
+    if isinstance(method, (pd.Series, np.ndarray)):
+        assert len(method) == len(col), 'Both arrays are not of the same length'
+        log(f'Replacing all samples with a "{col.name}" value of "{missing_value}" with their indexes in "{method.name}"', verbose)
+        # return col.apply(lambda sample: method[sample.index] if sample == missing_value else sample)
+        return pd.Series([(method[i] if col[i] == missing_value else col[i]) for i in range(len(col))])
+
+        # return pd.Series(col.reset_index().apply(lambda i: method[i] if col[i] == missing_value else col[i], axis=1).values, index=col.index)
+        # return col.apply(lambda sample: method[sample.index] if sample == missing_value else sample)
+    elif method == 'remove':
+        log(f'Removing all samples with "{col.name}" values of "{missing_value}"', verbose)
+        return without
+    elif method == 'mean':
+        if isCatagorical(col):
+            raise TypeError(f"Cannot get mean of a catagorical feature")
+        mean = without.mean()
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the mean ({mean:.2f})', verbose)
+        # Copy it for consistency
+        return col.copy().mask(col == missing_value, mean)
+    elif method == 'median':
+        if isCatagorical(col):
+            raise TypeError(f"Cannot get median of a catagorical feature")
+        median = without.median()
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the median ({median})', verbose)
+        return col.copy().mask(col == missing_value, median)
+    elif method == 'mode':
+        # I'm not sure how else to pick a mode, so just pick one at random
+        if MODE_SELECTION == 'random':
+            mode = random.choice(without.mode())
+        elif MODE_SELECTION == 'first':
+            mode = without.mode()[0]
+        elif MODE_SELECTION == 'last':
+            mode = without.mode()[-1]
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to a mode ({mode})', verbose)
+        return col.copy().mask(col == missing_value, mode)
+    elif method == 'random':
+        if isCatagorical(col):
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random catagories', verbose)
+            fill = lambda sample: random.choice(without.unique()) if sample == missing_value else sample
+        else:
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random values along a uniform distrobution', verbose)
+            fill = lambda sample: type(sample)(random.uniform(without.min(), without.max())) if sample == missing_value else sample
+
+            return col.apply(fill)
+    elif method == 'balanced_random':
+        if isCatagorical(col):
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to evenly distributed random catagories', verbose)
+            fill = lambda sample: random.choice(without) if sample == missing_value else sample
+        else:
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random values along a normal distrobution', verbose)
+            fill = lambda sample: type(sample)(random.gauss(without.mean(), without.std())) if sample == missing_value else sample
+        return col.apply(fill)
+    else:
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to {method}', verbose)
+        # col.loc[col == missing_value] = method
+        return col.copy().mask(col == missing_value, method)
+    return col
+
+def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any], verbose=False):
+    df = df.copy()
+    if isinstance(method, pd.Series):
+        log(f'Changing all samples where "{query}" is true to have the {column} values of their indecies in "{method.name}"', verbose)
+        q = df.query(query)
+        df.loc[q.index, column] = q.apply(lambda s: method[s.name], axis=1)
+    elif method == 'remove':
+        log(f'Removing all samples where "{query}" is true', verbose)
+        df = df.drop(df.query(query).index)
+    elif method == 'mean':
+        if isCatagorical(df[column]):
+            raise TypeError(f"Cannot get mean of a catagorical feature")
+        mean = df[column].mean()
+        log(f'Setting all samples where {query} is true to the mean of "{column}" ({mean:.2})', verbose)
+        df.loc[df.query(query).index, column] = mean
+    elif method == 'median':
+        if isCatagorical(df[column]):
+            raise TypeError(f"Cannot get median of a catagorical feature")
+        median = df[column].median()
+        log(f'Setting all samples where "{query}" is true to the median of "{column}" ({median})', verbose)
+        df.loc[df.query(query).index, column] = median
+    elif method == 'mode':
+        # I'm not sure how else to pick a mode, so just pick one at random
+        if MODE_SELECTION == 'random':
+            mode = random.choice(df[column].mode())
+        elif MODE_SELECTION == 'first':
+            mode = df[column].mode()[0]
+        elif MODE_SELECTION == 'last':
+            mode = df[column].mode()[-1]
+        log(f'Setting all samples where "{query}" is true to a mode of "{column}" ({mode})', verbose)
+        df.loc[df.query(query).index, column] = mode
+    elif method == 'random':
+        if isCatagorical(df[column]):
+            log(f'Setting all samples where "{query}" is true to have random catagories', verbose)
+            fill = lambda s: random.choice(df[column].unique())
+        else:
+            log(f'Setting all samples where "{query}" is true to have random values along a uniform distrobution', verbose)
+            fill = lambda s: type(s)(random.uniform(df[column].min(), df[column].max()))
+
+        q = df.query(query)
+        df.loc[q.index, column] = q[column].apply(fill)
+    elif method == 'balanced_random':
+        if isCatagorical(df[column]):
+            log(f'Setting all samples where "{query}" is true to have evenly distributed random catagories', verbose)
+            fill = lambda s: random.choice(df[column])
+        else:
+            log(f'Setting all samples where "{query}" is true to have random values along a normal distrobution', verbose)
+            fill = lambda s: type(s)(random.gauss(df[column].mean(), df[column].std()))
+
+        q = df.query(query)
+        df.loc[q.index, column] = q[column].apply(fill)
+    else:
+        log(f'Setting all samples where "{query}" is true to have a "{column}" value of  {method}', verbose)
+        df.loc[df.query(query).index, column] = method
+    return df
+
+def remove(col, val, verbose=False):
+    log(f'Removing all samples with a "{col.name}" value of {val}', verbose)
+    # return col.mask(col == val, val)
+    return col.drop(index=col[col == val].index)
+
+def bin(col, method:Union['frequency', 'width', Tuple, List], amt=5, verbose=False):
+    if isCatagorical(col):
+        raise TypeError(f"Can't bin catagorical feature '{col.name}'")
+
+    if   method == 'frequency':
+        log(f'Binning "{col.name}" by frequency into {amt} bins', verbose)
+        return pd.qcut(col, amt, duplicates='drop')
+    elif method == 'width':
+        log(f'Binning "{col.name}" by width into {amt} bins', verbose)
+        raise NotImplementedError('Width binning')
+    elif isinstance(method, (tuple, list)):
+        log(f'Custom binning "{col.name}" into {len(method)} bins', verbose)
+        return pd.cut(col, method)
+    else:
+        raise TypeError(f"Bin method parameter given invalid option {method}")
+
+def normalize(col, method='min-max', verbose=False):
+    if  method == 'min-max':
+        log(f'Normalizing "{col.name}" by min-max method', verbose)
+        return (col-col.min()) / (col.max()-col.min())
+    elif method == 'range':
+        log(f'Normalizing "{col.name}" by range method', verbose)
+        raise NotImplementedError(f'range normalization doesn\'t work yet')
+        return (col-col.mean()) / col.std()
+    else:
+        raise TypeError('Invalid method argument given')
+
+def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='one_hot_encode', returnAssignments=False, verbose=False) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Tuple['assignments']]]:
+    df = df.copy()
+    if isinstance(df, pd.Series) and method != 'assign':
+        raise TypeError("A DataFrame and column name is required when using one hot encoding to convert to numeric")
+        if isQuantatative(df):
+            raise TypeError(f"Series given is already quantatitive")
+    else:
+        if isQuantatative(df[col]):
+            raise TypeError(f"Series given is already quantatitive")
+
+    if method == 'assign':
+        log(f'Converting "{col}" to quantatative by assinging to arbitrary values', verbose)
+        if isinstance(df, pd.Series):
+            column, assings = pd.factorize(df)
+            return (column, assings) if returnAssignments else column
+        else:
+            assert col is not None, 'Please provide column to assign'
+            column, assings = pd.factorize(df[col])
+            df[col] = column
+            return (df, assings) if returnAssignments else df
+    elif method == 'one_hot_encode':
+        log(f'Converting "{df.name}" to quantatative by one hot encoding', verbose)
+        # df = pd.get_dummies(df, columns=[col])
+        if col is None:
+            col = ensureIterable(col)
+            return pd.get_dummies(df, columns=col)
+        else:
+            return pd.get_dummies(df)
+    else:
+        raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
 
 # The main functions
@@ -357,6 +598,7 @@ def explore(data,
         elif page == 'Duplicates':
                 todo()
         elif page == 'Head':
+            with pd.option_context('display.max_columns', None):
                 display(data.head())
         elif page == 'Counts':
                 # This is sorted just so the features with less unique options go first
@@ -417,7 +659,7 @@ def explore(data,
                     print(f'It has an entropy of {scipy.stats.entropy(data[feature].value_counts(normalize=True), base=entropy):.3f}', end=', ')
                     print(f'and a cardinaltiy of {len(data[feature].unique())}')
                     print('Value counts:')
-                    print(pretty_counts(data[feature]))
+                    print(pretty_counts(data[feature], paren=True))
 
                     sns.histplot(data[feature])
 
@@ -570,269 +812,65 @@ def suggestedCleaning(df, target):
 
 def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
     global MODE_SELECTION
-    log = lambda s: print('\t' + s) if verbose else None
     missing = np.nan
     # We're allowing column to be None for the specific case of add_column (which doesn't require a column)
     if column in df.columns or column is None:
         for op, options in args.items():
+            # Quick parameter type checking for bools
+            if options == False and op not in ('missing_value', 'remove'):
+                continue
+            if options == True and not ignoreWarnings and op not in ('drop_duplicates', 'missing_value', 'remove', 'drop'):
+                raise TypeError(f"'True' is an invalid option for {op} (for column {column})")
+
             if   op == 'drop_duplicates':
-                if options:
-                    warn('drop_duplicates hasnt been implemented yet for induvidual columns. What are you trying to do?')
-                    # log(f'Dropping duplicates in {column}')
-                    # df[column].drop_duplicates(inplace=True)
+                warn('drop_duplicates hasnt been implemented yet for induvidual columns. What are you trying to do?')
             elif op == 'handle_outliers':
-                # warn('handle_outliers is untested')
                 zscore, method = options
-                if options != False:
-                    samples = df[column][np.abs(scipy.stats.zscore(df[column])) > zscore]
-                    if method == 'remove':
-                        df = df.drop(samples.index)
-                    elif method == 'constrain':
-                        todo('Breaks on negative values')
-                        # todo try optionally getting everything *not* in range instead of just the things in rang
-                        # The value that corresponds to a given score is the standard deviate * zscore
-                        max = df[column].std() * zscore
-                        # df.loc[samples.index, column] = np.clip(samples, -max, max)
-                        df.loc[samples.index, column] = np.clip(samples, -max, max)
-                    else:
-                        raise TypeError(f"Invalid handle_outliers arguement '{method}' given")
+                df[column] = handle_outliers(df[colulmn], method, zscore=zscore, verbose=verbose)
             elif op == 'replace':
-                if options == True:
-                    if not ignoreWarnings:
-                        raise TypeError(f"Please specify a dict for the replace option")
-                if isinstance(options, dict):
-                    log(f'Replacing {column}')
-                    df[column] = df[column].replace(options)
+                if not isinstance(options, dict):
+                    raise TypeError(f"Please specify a dict for the replace option (under column {column})")
+                log(f'Replacing specified entries in {column}', verbose)
+                df[column] = df[column].replace(options)
             elif op == 'apply':
-                if options == True:
-                    if not ignoreWarnings:
-                        raise TypeError(f"Please specify a function to apply")
-                elif callable(options):
+                if callable(options):
                     log(f'Applying function to {column}')
-                    df[column] = df[column].apply(options)
+                    df[column] = df[column].apply(options, axis=1)
+                else:
+                    if not ignoreWarnings:
+                        raise TypeError(f"Please specify a function to apply (under column {column})")
             elif op == 'missing_value':
                 missing = options
             elif op == 'handle_missing':
-                without = df.loc[df[column] != missing]
-                # match options:
-                if isinstance(options, pd.Series):
-                        def fill(sample):
-                            if sample[column] == missing:
-                                return options[sample.name]
-                            else:
-                                return sample[column]
-                        log(f'Replacing all samples with a "{column}" value of "{missing}" with their indexes in "{options.name}"')
-                        df[column] = df.apply(fill, axis=1)
-                elif options == True:
-                        if not ignoreWarnings:
-                            raise TypeError(f"Please specify a value or method for the handle_missing option")
-                elif options == False:
-                        pass
-                elif options == 'remove':
-                        log(f'Removing all samples with a "{column}" values of "{missing}"')
-                        df = without
-                elif options == 'mean':
-                        if isCatagorical(df[column]):
-                            if not ignoreWarnings:
-                                raise TypeError(f"Cannot get mean of a catagorical feature")
-                            else:
-                                continue
-                        mean = without[column].mean()
-                        log(f'Setting all samples with a "{column}" value of "{missing}" to the mean ({mean:.2})')
-                        df.loc[df[column] == missing, column] = mean
-                elif options == 'median':
-                        if isCatagorical(df[column]):
-                            if not ignoreWarnings:
-                                raise TypeError(f"Cannot get median of a catagorical feature")
-                            else:
-                                continue
-                        median = without[column].median()
-                        log(f'Setting all samples with a "{column}" value of "{missing}" to the median ({median})')
-                        df.loc[df[column] == missing, column] = median
-                elif options == 'mode':
-                        # I'm not sure how else to pick a mode, so just pick one at random
-                        if MODE_SELECTION == 'random':
-                            mode = random.choice(without[column].mode())
-                        elif MODE_SELECTION == 'first':
-                            mode = without[column].mode()[0]
-                        elif MODE_SELECTION == 'last':
-                            mode = without[column].mode()[-1]
-                        log(f'Setting all samples with a "{column}" value of "{missing}" to a mode ({mode})')
-                        df.loc[df[column] == missing, column] = mode
-                elif options == 'random':
-                        if isCatagorical(df[column]):
-                            log(f'Setting all samples with a "{column}" value of "{missing}" to random catagories')
-                            def fill(sample):
-                                if sample == missing:
-                                    return random.choice(without[column].unique())
-                                else:
-                                    return sample
-                        else:
-                            log(f'Setting all samples with a "{column}" value of "{missing}" to random values along a uniform distrobution')
-                            def fill(sample):
-                                if sample == missing:
-                                    return type(sample)(random.uniform(without[column].min(), without[column].max()))
-                                else:
-                                    return sample
-
-                        df[column] = df[column].apply(fill)
-                elif options == 'balanced_random':
-                        if isCatagorical(df[column]):
-                            log(f'Setting all samples with a "{column}" value of "{missing}" to evenly distributed random catagories')
-                            def fill(sample):
-                                if sample == missing:
-                                    return random.choice(without[column])
-                                else:
-                                    return sample
-                        else:
-                            log(f'Setting all samples with a "{column}" value of "{missing}" to random values along a normal distrobution')
-                            def fill(sample):
-                                if sample == missing:
-                                    return type(sample)(random.gauss(without[column].mean(), without[column].std()))
-                                else:
-                                    return sample
-                        df[column] = df[column].apply(fill)
-                else:
-                        log(f'Setting all samples with a "{column}" value of "{missing}" to {options}')
-                        df.loc[df[column] == missing, column] = options
-            elif op == 'queries':
-                if options == True:
-                    if not ignoreWarnings:
-                        raise TypeError(f"Please specify a queries and values for the queries option")
-                elif options == False:
+                if options in ('mean', 'median') and isCatagorical(df[column]) and ignoreWarnings:
                     continue
-                else:
-                    # try:
-                        # If there's just one query, just accept it
-                        if len(options) == 2 and type(options[0]) is str:
-                            options = [options]
-
-                        for query, replacement in options:
-                            # match replacement:
-                            if isinstance(replacement, pd.Series):
-                                    def fill(sample):
-                                        return replacement[sample.name]
-
-                                    log(f'Changing all samples where "{query}" is true to have the {column} values of their indecies in "{replacement.name}"')
-                                    q = df.query(query)
-                                    df.loc[q.index, column] = q.apply(fill, axis=1)
-                                    # df[column] = df.apply(fill, axis=1)
-                            elif replacement == 'remove':
-                                    log(f'Removing all samples where "{query}" is true')
-                                    df = df.drop(df.query(query).index)
-                            elif replacement == 'mean':
-                                    if isCatagorical(df[column]):
-                                        if not ignoreWarnings:
-                                            raise TypeError(f"Cannot get mean of a catagorical feature")
-                                        else:
-                                            continue
-                                    mean = df[column].mean()
-                                    log(f'Setting all samples where {query} is true to the mean of "{column}" ({mean:.2})')
-                                    df.loc[df.query(query).index, column] = mean
-                            elif replacement == 'median':
-                                    if isCatagorical(df[column]):
-                                        if not ignoreWarnings:
-                                            raise TypeError(f"Cannot get median of a catagorical feature")
-                                        else:
-                                            continue
-                                    median = df[column].median()
-                                    log(f'Setting all samples where "{query}" is true to the median of "{column}" ({median})')
-                                    df.loc[df.query(query).index, column] = median
-                            elif replacement == 'mode':
-                                    # I'm not sure how else to pick a mode, so just pick one at random
-                                    if MODE_SELECTION == 'random':
-                                        mode = random.choice(df[column].mode())
-                                    elif MODE_SELECTION == 'first':
-                                        mode = df[column].mode()[0]
-                                    elif MODE_SELECTION == 'last':
-                                        mode = df[column].mode()[-1]
-                                    log(f'Setting all samples where "{query}" is true to a mode of "{column}" ({mode})')
-                                    df.loc[df.query(query).index, column] = mode
-                            elif replacement == 'random':
-                                    if isCatagorical(df[column]):
-                                        log(f'Setting all samples where "{query}" is true to have random catagories')
-                                        def fill(sample):
-                                            return random.choice(df[column].unique())
-                                    else:
-                                        log(f'Setting all samples where "{query}" is true to have random values along a uniform distrobution')
-                                        def fill(sample):
-                                            return type(sample)(random.uniform(df[column].min(), df[column].max()))
-
-                                    q = df.query(query)
-                                    df.loc[q.index, column] = q[column].apply(fill)
-                            elif replacement == 'balanced_random':
-                                    if isCatagorical(df[column]):
-                                        log(f'Setting all samples where "{query}" is true to have evenly distributed random catagories')
-                                        def fill(sample):
-                                            return random.choice(df[column])
-                                    else:
-                                        log(f'Setting all samples where "{query}" is true to have random values along a normal distrobution')
-                                        def fill(sample):
-                                            return type(sample)(random.gauss(df[column].mean(), df[column].std()))
-
-                                    q = df.query(query)
-                                    df.loc[q.index, column] = q[column].apply(fill)
-                            else:
-                                    log(f'Setting all samples where "{query}" is true to have a "{column}" value of  {options}')
-                                    df.loc[df.query(query).index, column] = replacement
-                    # except ValueError:
-                        # raise TypeError(f"Invalid queries option. It's supposed to be a list of 2 item tuples.")
+                # This will throw the appropriate errors otherwise
+                df[column] = handle_missing(df[column], method=options, missing_value=missing, verbose=verbose)
+            elif op == 'queries':
+                if options in ('mean', 'median') and isCatagorical(df[column]) and ignoreWarnings:
+                    continue
+                # If there's just one query, just accept it
+                if len(options) == 2 and type(options[0]) is str:
+                    options = [options]
+                for q, method in options:
+                    df = query(df, column, q, method, verbose=verbose)
             elif op == 'remove':
-                log(f'Removing all samples with a "{column}" value of {options}')
-                df = df.loc[df[column] != options]
+                df[column] = remove(df[column], options, verbose=verbose)
             elif op == 'bin':
-                if isCatagorical(df[column]):
-                    if not ignoreWarnings:
-                        warn(f'The bin option was set on "{column}", which is not quantatative, skipping.')
-                        continue
+                if isCatagorical(df[column]) and not ignoreWarnings:
+                    warn(f'The bin option was set on "{column}", which is not quantatative, skipping.')
                 else:
-                    # match options:
-                    if options == True:
-                            if not ignoreWarnings:
-                                raise TypeError(f"Please specify a method for the bin option")
-                    elif options[0] == 'frequency':
-                            log(f'Binning "{column}" by frequency into {options[1]} bins')
-                            df[column] = pd.qcut(df[column], options[1], duplicates='drop')
-                    elif options[0] == 'width':
-                            log(f'Binning "{column}" by width into {options[1]} bins')
-                            raise NotImplementedError('Width binning')
-                    elif isinstance(options, (tuple, list)):
-                            log(f'Custom binning "{column}" into {len(options)} bins')
-                            df[column] = pd.cut(df[column], options)
-                    else:
-                        raise TypeError(f"Bin option given bad arguement")
+                    df[column] = bin(df[column], method, amt, verbose=verbose)
             elif op == 'normalize':
-                if isCatagorical(df[column]):
-                    if not ignoreWarnings:
-                        warn(f'The normalize option was set on {column}, which is not quantatative, skipping.')
-                        continue
+                if isCatagorical(df[column]) and not ignoreWarnings:
+                    warn(f'The normalize option was set on {column}, which is not quantatative, skipping.')
                 else:
-                    # match options:
-                    if options == True or options == 'min-max':
-                        log(f'Normalizing "{column}" by min-max method')
-                        df[column] = (df[column]-df[column].min())/(df[column].max()-df[column].min())
-                    elif options == 'range':
-                        log(f'Normalizing "{column}" by range method')
-                        raise NotImplementedError(f'range normalization doesn\'t work yet')
-                        df[column] = (df[column]-df[column].mean())/df[column].std()
-                    else:
-                        raise TypeError('Invalid normalize argument given')
+                    df[column] = normalize(df[column], options, verbose=verbose)
             elif op == 'convert_numeric':
-                # We *do* want to convert numbers by defualt
-                if isQuantatative(df[column], time=False):
-                    if not ignoreWarnings:
-                        warn(f'The conver_numeric option was set on {column}, which is not catagorical, skipping.')
-                        continue
+                if isQuantatative(df[column], time=False) and not ignoreWarnings:
+                    warn(f'The conver_numeric option was set on {column}, which is not catagorical, skipping.')
                 else:
-                    # match options:
-                    if options == True or options == 'assign':
-                        log(f'Converting "{column}" to quantatative by assinging to arbitrary values')
-                        df[column], _ = pd.factorize(df[column])
-                    elif options == 'one_hot_encode':
-                        log(f'Converting "{column}" to quantatative by one hot encoding')
-                        df = pd.get_dummies(df, columns=[column])
-                    else:
-                        raise TypeError(f"Bad arguement given to convert_numeric")
+                    df = convert_numeric(df, column, options, verbose=verbose)
             elif op == 'add_column':
                 if isinstance(options, (tuple, list)):
                     if not isinstance(options[0], (tuple, list)):
@@ -867,25 +905,23 @@ def clean(df:pd.DataFrame,
                 {
                     # Do these to all the columns, or a specified column
                     'column/all': {
-                        # Drop the column
-                        'drop': bool,
                         # Drop duplicate samples
-                        # Only applies to all
+                        ## Only applies to all
                         'drop_duplicates': bool,
                         # Removes samples which have a Z-score magnitude of greater than this value
-                        'handle_outliers': Union[bool, Tuple[float, Union['remove', 'constrain']],
+                        'handle_outliers': Union[bool, Tuple[float, Union['remove', 'constrain']]],
                         # Maps feature values to a dictionary
                         'replace': Union[bool, Dict],
                         # Applies a function to the column
                         'apply': Union[bool, Callable],
                         # A list of (query, replacements).
-                        # If a Series is given, it will replace those values with the values at it's corresponding index
-                        # 'random' replaces values with either a random catagory, or a random number between min and max
-                        # 'balanced_random' replaces values with either a randomly sampled catagory (sampled from the column
-                        # itself, so it's properly biased), or a normally distributed sample
+                        ## If a Series is given, it will replace those values with the values at it's corresponding index
+                        ## 'random' replaces values with either a random catagory, or a random number between min and max
+                        ## 'balanced_random' replaces values with either a randomly sampled catagory (sampled from the column
+                        ## itself, so it's properly biased), or a normally distributed sample
                         'queries': Union[bool, List[Tuple[str, Union[Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any]]]],
                         # A ndarray of shape (1, n) of values to create a new column with the given name
-                        # Calling from a specific column has no effect, behaves the same under all
+                        ## Calling from a specific column has no effect, behaves the same under all
                         'add_column': Union[Tuple[str, np.ndarray], List[Tuple[str, np.ndarray]]],
                         # Specifies a value that is equivalent to the feature being missing
                         'missing_value': Any,
@@ -899,6 +935,8 @@ def clean(df:pd.DataFrame,
                         'normalize': Union[bool, 'min-max', 'range'],
                         # Specifies a method by which to convert a catagorical feature to a quantative one
                         'convert_numeric': Union[bool, 'assign', 'one_hot_encode'],
+                        # Drop the column
+                        'drop': bool,
                     },
                 }
     """
@@ -1025,7 +1063,24 @@ def evaluate(test, testPredictions, train=None, trainPredictions=None, accuracy=
             _quantatative(False)
 fullTest = evaluate
 
-def importances(tree, names=None, rtn=False, graph=True):
+"""
+TODO: Add cross-validation to evaluate
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+# X = ... # training data
+# y = ... # target variable
+
+# model = LogisticRegression()
+# scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+
+# print("Accuracy: %0.2f (+/- %0.2f)" % (np.mean(scores), np.std(scores) * 2))
+
+ """
+
+
+def importances(tree, names=None, rtn=False, graph=True, best=.01):
     if names is None:
         names = tree.feature_names_in_
     df = pd.DataFrame({
@@ -1033,7 +1088,11 @@ def importances(tree, names=None, rtn=False, graph=True):
         'importance': tree.feature_importances_
     })
 
-    df = df.assign(best=df.importance > .05)
+    if best:
+        # df = df.assign(best=df.importance > best)
+        df = df.loc[df.importance >= best]
+
+
     df = df.sort_values(by='importance', ascending=False, axis=0)
     if graph:
         sns.catplot(data=df, x='importance', y='feature', kind='bar', height=10, aspect=2)
@@ -1042,12 +1101,22 @@ def importances(tree, names=None, rtn=False, graph=True):
     if rtn:
         return df
 
-def saveStats(name, model, testY, predY, trainY=None, trainPredY=None, new=False, show=True):
+def saveStats(file, name, model, testY, predY, trainY=None, trainPredY=None, notes='', new=False, show=True, save=True):
     def doit():
+        print(name + ':')
+        print(notes)
+        print()
+        print('Model type:', type(model))
+        print('Parameters:')
+        for key, val in model.get_params().items():
+            print(f'\t{key}: {val}')
+        print('\nImportances:')
         print(importances(model, rtn=True, graph=False))
-        evaluate(testY, predY, trainPredY, trainY, compact=True)
+        print('\nStats:')
+        evaluate(testY, predY, trainY, trainPredY, compact=False)
+        print('\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n')
 
-    with open(name + '.txt', 'w' if new else 'a') as f:
+    with open(file, 'w' if new else 'a') as f:
         with redirect_stdout(f):
             doit()
     if show:
