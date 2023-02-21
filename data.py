@@ -428,6 +428,21 @@ def normalize(col, method='sklearn', verbose=False):
     else:
         raise TypeError('Invalid method argument given')
 
+def convert_time(df_or_col, col:str=None, method:Union['timestamp']='timestamp', verbose=False):
+    assert not (isinstance(df_or_col, pd.Series) and col is not None), 'Please dont provide a col parameter if passing a Series'
+    if isinstance(df_or_col, pd.DataFrame) and col is None:
+        df = df_or_col.copy()
+        df[timeFeatures(df).columns] = timeFeatures(df).applymap(lambda date: date.timestamp())
+        return df
+    else:
+        if isinstance(df_or_col, pd.DataFrame):
+            df_or_col = df_or_col[col]
+        return df_or_col.apply(lambda date: date.timestamp())
+
+
+
+
+
 def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='one_hot_encode', returnAssignments=False, skip=[], verbose=False):
     df = df.copy()
     # if isinstance(df, pd.Series) and method == 'one_hot_encode':
@@ -473,6 +488,7 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
 def parse_date(col, verbose=False):
+    assert isinstance(col, pd.Series), 'Please pass in a Series'
     log(f'Parsing {col.name} as dates ', verbose)
     return pd.Series(pd.DatetimeIndex(col))
 parseDate = parse_date
