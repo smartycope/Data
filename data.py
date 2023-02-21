@@ -487,6 +487,7 @@ def explore(data,
             entropy=None,
             start='Head',
             startFeature=None,
+            alpha=None,
     ):
     # Parse params and make sure all the params are valid
     assert not isinstance(target, (list, tuple)), 'There can only be 1 target feature'
@@ -508,7 +509,7 @@ def explore(data,
     # Define variables
     whatTheHeck = (corr, missing)
     max_name_len = len(max(data.columns, key=len))
-    ALPHA = min(1, 1000/len(data))
+    ALPHA = min(1, 1000/len(data)) if alpha is None else alpha
 
 
     # Define widget[s]
