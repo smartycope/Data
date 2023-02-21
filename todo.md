@@ -14,7 +14,7 @@
 - add a loading bar for matrix plot and other plots
 - add an entropy threshold option
 - add these to the feature specific menu:
-    - mode\[s], std, quantative entropy, catagorical correlations, data.groupby(feature)\[target].value_counts()
+    - model\[s], std, quantative entropy, catagorical correlations, data.groupby(feature)\[target].value_counts()
 - Alerts for:
     - Check that entropy isn't too low
     - check that relative entropy isn't too low
@@ -22,7 +22,9 @@
     - high correlations between features
     - kurtosis value being too high/low
     - Not very many items in a catagory
+    - Check for duplicate samples
 - add boxplots
+- add an alpha value, which is automatically adjusted depending on how many samples there are
 
 # SuggestedCleaning
 - A function that does a bunch of math and returns a suggested clean config

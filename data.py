@@ -6,6 +6,7 @@ from warnings import warn
 import random
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import sklearn
+from sklearn.preprocessing import MinMaxScaler
 from math import sqrt
 import seaborn as sns
 # from scipy.stats import entropy as _entropy
@@ -246,11 +247,6 @@ def interactWithOutliers(df, feature=None, step=.2):
     )
 
 # Clean Functions
-# DataFrame.drop_duplicates(inplace=True)
-# DataFrame.replace({})
-# DataFrame.apply(func, axis=1)
-    # Series.apply(func)
-#
 log = lambda s, v: print('\t' + s) if v else None
 def handle_outliers(col, method:Union['remove', 'constrain']='remove', zscore=3, verbose=False):
     # TODO: add more options here (like getting outliers via kurtosis & IQR)
@@ -412,12 +408,21 @@ def bin(col, method:Union['frequency', 'width', Tuple, List], amt=5, verbose=Fal
     else:
         raise TypeError(f"Bin method parameter given invalid option {method}")
 
-def normalize(col, method='min-max', verbose=False):
+def normalize(col, method='sklearn', verbose=False):
+    name = col.name if isinstance(col, pd.Series) else 'DataFrame'
     if  method == 'min-max':
-        log(f'Normalizing "{col.name}" by min-max method', verbose)
+        log(f'Normalizing "{name}" by min-max method', verbose)
+        if isisntace(col, pd.DataFrame):
+            raise TypeError('Only single Series normalizing is implemented right now, not a whole DataFrame. Try using the sklearn method')
         return (col-col.min()) / (col.max()-col.min())
+    elif method == 'sklearn':
+        log(f'Normalizing "{name}" by min-max method', verbose)
+        if isinstance(col, pd.Series):
+            return pd.Series(MinMaxScaler().fit_transform(col.values.reshape(-1,1)).T[0])
+        else:
+            return pd.DataFrame(MinMaxScaler().fit_transform(col))
     elif method == 'range':
-        log(f'Normalizing "{col.name}" by range method', verbose)
+        log(f'Normalizing "{name}" by range method', verbose)
         raise NotImplementedError(f'range normalization doesn\'t work yet')
         return (col-col.mean()) / col.std()
     else:
@@ -467,6 +472,9 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
+def parseDate(col, verbose=False):
+    log(f'Parsing {col.name} as dates ', verbose)
+    return pd.Series(pd.DatetimeIndex(col))
 
 # The main functions
 def explore(data,
