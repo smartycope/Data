@@ -229,13 +229,13 @@ def meanConfInterval(data, confidence=0.95, mean=False):
     else:
         return m-h, m+h
 
-def showOutliers(data, column, zscore):
+def showOutliers(data, column, zscore, **snsArgs):
     if isCatagorical(data[column]):
         raise TypeError('Outliers only apply to quantitative values')
     samples = getOutliers(data[column], zscore=zscore)
     print(len(samples), len(data[column]), sep='/')
-    sns.scatterplot(data=data[column])
-    sns.scatterplot(data=samples)
+    sns.scatterplot(data=data[column], **snsArgs)
+    sns.scatterplot(data=samples, **snsArgs)
     plt.show()
 
 def interactWithOutliers(df, feature=None, step=.2):
@@ -492,6 +492,7 @@ def explore(data,
     assert not isinstance(target, (list, tuple)), 'There can only be 1 target feature'
     assert target is None or target in data.columns, f'Target {target} is not one of the features'
     assert startFeature is None or startFeature in data.columns, 'startFeature must be a valid column name'
+    assert len(data), 'DataFrame cannot be empty'
 
     if stats is None:
         stats = ['mean', 'median', 'std', 'min', 'max']
@@ -507,6 +508,7 @@ def explore(data,
     # Define variables
     whatTheHeck = (corr, missing)
     max_name_len = len(max(data.columns, key=len))
+    ALPHA = min(1, 1000/len(data))
 
 
     # Define widget[s]
@@ -740,7 +742,7 @@ def explore(data,
                     # def interactWithOutliers(df, feature=None, step=.2):
                     # widgets.interactive(
                     print()
-                    showOutliers(data, feature, zscore)
+                    showOutliers(data, feature, zscore, alpha=ALPHA)
                         # data=widgets.fixed(df),
                         # column=list(df.columns) if feature is None else widgets.fixed(feature),
                         # zscore=(0., df[feature].max() / df[feature].std(), step) if feature is not None else (0., 10, step)
@@ -763,7 +765,7 @@ def explore(data,
                 featureBBox.layout.visibility = 'visible'
                 featureHueBox.layout.visibility = 'visible'
 
-                graph = sns.scatterplot(x=data[a], y=data[b], hue=None if hue == 'None' else data[hue])
+                graph = sns.scatterplot(x=data[a], y=data[b], hue=None if hue == 'None' else data[hue], alpha=ALPHA)
                 if isQuantatative(data[a]) and isQuantatative(data[b]):
                     try:
                         graph.set(title=f'Correlation: {data.corr()[a][b]:0.1%}')
