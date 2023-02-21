@@ -472,9 +472,10 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
-def parseDate(col, verbose=False):
+def parse_date(col, verbose=False):
     log(f'Parsing {col.name} as dates ', verbose)
     return pd.Series(pd.DatetimeIndex(col))
+parseDate = parse_date
 
 # The main functions
 def explore(data,
@@ -554,6 +555,12 @@ def explore(data,
                     description='y',
         )
     featureBBox.layout.visibility = 'hidden'
+    featureHueBox = widgets.Dropdown(
+        options=list(data.columns) + ['None'],
+                    value='None',
+                    description='hue',
+        )
+    featureHueBox.layout.visibility = 'hidden'
     outlierSlider = widgets.FloatSlider(
         value=3,
         min=0.,
@@ -569,12 +576,13 @@ def explore(data,
     outlierSlider.layout.visibility = 'hidden'
 
     # All the actual logic
-    def output(page, feature, a, b, zscore):
+    def output(page, feature, a, b, hue, zscore):
         # See baffled comment above
         corr, missing = whatTheHeck
         featureBox.layout.visibility = 'hidden'
         featureABox.layout.visibility = 'hidden'
         featureBBox.layout.visibility = 'hidden'
+        featureHueBox.layout.visibility = 'hidden'
         outlierSlider.layout.visibility = 'hidden'
         # Clear the output (because colab doesn't automatically or something?)
         clear_output(wait=True)
@@ -753,8 +761,9 @@ def explore(data,
         elif page == 'Custom Plots':
                 featureABox.layout.visibility = 'visible'
                 featureBBox.layout.visibility = 'visible'
+                featureHueBox.layout.visibility = 'visible'
 
-                graph = sns.scatterplot(x=data[a], y=data[b])
+                graph = sns.scatterplot(x=data[a], y=data[b], hue=None if hue == 'None' else data[hue])
                 if isQuantatative(data[a]) and isQuantatative(data[b]):
                     try:
                         graph.set(title=f'Correlation: {data.corr()[a][b]:0.1%}')
@@ -823,13 +832,13 @@ def explore(data,
                 print('Invalid start option')
 
     # widgets.interact(output, page=combobox, feature=featureBox)
-    ui = widgets.GridBox([combobox, featureABox, featureBox, featureBBox, outlierSlider], layout=widgets.Layout(
+    ui = widgets.GridBox([combobox, featureABox, featureBox, featureBBox, outlierSlider, featureHueBox], layout=widgets.Layout(
                 grid_template_columns='auto auto',
                 grid_row_gap='10px',
                 grid_column_gap='100px',
             )
        )
-    out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox, 'zscore': outlierSlider})
+    out = widgets.interactive_output(output, {'page': combobox, 'feature': featureBox, 'a': featureABox, 'b': featureBBox, 'hue': featureHueBox, 'zscore': outlierSlider})
     display(ui, out)
 quickSummary = explore
 

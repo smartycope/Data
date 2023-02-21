@@ -25,6 +25,7 @@
     - Check for duplicate samples
 - add boxplots
 - add an alpha value, which is automatically adjusted depending on how many samples there are
+- add counts of quantative features
 
 # SuggestedCleaning
 - A function that does a bunch of math and returns a suggested clean config
