@@ -41,6 +41,7 @@
 - bin by month function
 - add inplace parameters to all the functions (and maybe have them defualt to True?)
 - add a parameter in convert_numeric() to include time types
+- add actually normalization to rescale
 
 # Resample
 - Add mixed option (and a tradeoff parameter)

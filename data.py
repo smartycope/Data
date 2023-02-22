@@ -420,7 +420,7 @@ def rescale(col, method='sklearn', verbose=False):
         if isinstance(col, pd.Series):
             return pd.Series(MinMaxScaler().fit_transform(col.values.reshape(-1,1)).T[0])
         else:
-            return pd.DataFrame(MinMaxScaler().fit_transform(col))
+            return pd.DataFrame(MinMaxScaler().fit_transform(col), columns=col.columns)
     elif method == 'range':
         log(f'Normalizing "{name}" by range method', verbose)
         raise NotImplementedError(f'range normalization doesn\'t work yet')
