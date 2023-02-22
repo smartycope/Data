@@ -408,7 +408,7 @@ def bin(col, method:Union['frequency', 'width', Tuple, List], amt=5, verbose=Fal
     else:
         raise TypeError(f"Bin method parameter given invalid option {method}")
 
-def normalize(col, method='sklearn', verbose=False):
+def rescale(col, method='sklearn', verbose=False):
     name = col.name if isinstance(col, pd.Series) else 'DataFrame'
     if  method == 'min-max':
         log(f'Normalizing "{name}" by min-max method', verbose)
@@ -427,6 +427,8 @@ def normalize(col, method='sklearn', verbose=False):
         return (col-col.mean()) / col.std()
     else:
         raise TypeError('Invalid method argument given')
+# For backwards compatibility
+normalize = rescale
 
 def convert_time(df_or_col, col:str=None, method:Union['timestamp']='timestamp', verbose=False):
     assert not (isinstance(df_or_col, pd.Series) and col is not None), 'Please dont provide a col parameter if passing a Series'
@@ -438,10 +440,6 @@ def convert_time(df_or_col, col:str=None, method:Union['timestamp']='timestamp',
         if isinstance(df_or_col, pd.DataFrame):
             df_or_col = df_or_col[col]
         return df_or_col.apply(lambda date: date.timestamp())
-
-
-
-
 
 def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='one_hot_encode', returnAssignments=False, skip=[], verbose=False):
     df = df.copy()
@@ -487,11 +485,12 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
-def parse_date(col, verbose=False):
-    assert isinstance(col, pd.Series), 'Please pass in a Series'
-    log(f'Parsing {col.name} as dates ', verbose)
-    return pd.Series(pd.DatetimeIndex(col))
-parseDate = parse_date
+# def parse_date(col, format='', verbose=False):
+#     assert isinstance(col, pd.Series), 'Please pass in a Series'
+#     log(f'Parsing {col.name} as dates ', verbose)
+#     # return pd.Series(pd.DatetimeIndex(col))
+#     return pd.to_datetime(col, format=format)
+# parseDate = parse_date
 
 # The main functions
 def explore(data,
@@ -501,7 +500,7 @@ def explore(data,
             missing=True,
             corr=.55,
             entropy=None,
-            start='Head',
+            start='Description',
             startFeature=None,
             alpha=None,
     ):

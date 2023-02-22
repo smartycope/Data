@@ -39,6 +39,7 @@
     - like so you don't have to make a new config for a holdout set
 - Split this up into a ton of mini functions instead
 - bin by month function
+- add inplace parameters to all the functions (and maybe have them defualt to True?)
 
 # Resample
 - Add mixed option (and a tradeoff parameter)
