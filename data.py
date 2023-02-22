@@ -485,6 +485,23 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
+def split(*data, amt=.2, method:Union['random', 'chunk']='random', target=[], seed=42):
+    splitMe = []
+    for d in ensureIterable(data):
+        d = d.copy()
+        for t in ensureIterable(target):
+            splitMe.append(d.pop(t))
+        splitMe.insert(-2, d)
+
+    if method == 'random':
+        return skms.train_test_split(*splitMe, test_size=amt, random_state=seed)
+    elif method == 'chunk':
+        split = round(len(X) * (1-amt))
+        rtn = [(d.iloc[:split], d.iloc[split:]) for d in splitMe]
+    else:
+        raise TypeError(f"Invalid method parameter given")
+
+
 # def parse_date(col, format='', verbose=False):
 #     assert isinstance(col, pd.Series), 'Please pass in a Series'
 #     log(f'Parsing {col.name} as dates ', verbose)

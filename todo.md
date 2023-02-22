@@ -40,6 +40,7 @@
 - Split this up into a ton of mini functions instead
 - bin by month function
 - add inplace parameters to all the functions (and maybe have them defualt to True?)
+- add a parameter in convert_numeric() to include time types
 
 # Resample
 - Add mixed option (and a tradeoff parameter)
