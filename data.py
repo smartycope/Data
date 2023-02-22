@@ -485,27 +485,46 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
-def split(*data, amt=.2, method:Union['random', 'head', 'tail']='random', target=[], seed=42):
+def split(*data, amt=.2, method:Union['random', 'chunk', 'head', 'tail']='random', target=[], splitTargets=True, seed=42):
+    """ Splits the given data, both into train/test sets, and by taking out targets at the same time
+        `target` can be a string or an iterable
+        If `splitTargets` is set to False, the targets will always return DataFrames, even if
+            they only have 1 column
+        If you pass in multiple items for data, AND specify a target feature[s], then all the items
+            must have the target columns
+        The order goes:
+            train_X, test_X, train_X1, test_X1, ..., train_y, test_y, train_y1, test_y1
+            where it continues adding data and target splits in the order they are given.
+            Simply put, it outputs in the same order you input the parameters as much as possible.
+            Don't give multiple data AND split targets at the same time. While it can do it,
+                it's simply too confusing to think through the order of the returned parameters.
+        Setting the `method` to 'chunk' is the same as setting it to 'tail'.
+    """
+    if len(ensureIterable(data)) > 1 and len(target):
+        warn("Please don't give multiple data AND split targets at the same time. While it can do it, "
+             "it's simply too confusing to think through the order of the returned parameters.")
     # Pop the targets and combine everything into 1 ordered list of things we need to split
     splitMe = []
     for d in ensureIterable(data):
         d = d.copy()
-        popped = False
-        for t in ensureIterable(target):
-            splitMe.append(d.pop(t))
-            popped = True
+
+        targets = [d.pop(t) for t in ensureIterable(target)]
+        if splitTargets:
+            splitMe += targets
+        else:
+            splitMe.append(pd.DataFrame(dict(zip(ensureIterable(target), targets))))
         # It makes more sense to do data, then target, not target then data
         # I think this should actually be -1... I'm not sure why -2 works...
-        splitMe.insert(-2 if popped else len(splitMe), d)
+        splitMe.insert(-2 if len(targets) else len(splitMe), d)
 
     # Now split everything in the list (order is important!)
     if method == 'random':
         return skms.train_test_split(*splitMe, test_size=amt, random_state=seed)
-    elif method in ('head', 'tail'):
+    elif method in ('head', 'tail', 'chunk'):
         rtn = []
         for d in splitMe:
             # Head an tail splitting are the same, just with opposite amts
-            split = round(len(d) * ((1-amt) if method == 'tail' else amt))
+            split = round(len(d) * (amt if method == 'head' else (1-amt)))
             rtn += [d.iloc[:split], d.iloc[split:]]
         return rtn
     else:
