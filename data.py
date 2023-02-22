@@ -485,19 +485,29 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
-def split(*data, amt=.2, method:Union['random', 'chunk']='random', target=[], seed=42):
+def split(*data, amt=.2, method:Union['random', 'head', 'tail']='random', target=[], seed=42):
+    # Pop the targets and combine everything into 1 ordered list of things we need to split
     splitMe = []
     for d in ensureIterable(data):
         d = d.copy()
+        popped = False
         for t in ensureIterable(target):
             splitMe.append(d.pop(t))
-        splitMe.insert(-2, d)
+            popped = True
+        # It makes more sense to do data, then target, not target then data
+        # I think this should actually be -1... I'm not sure why -2 works...
+        splitMe.insert(-2 if popped else len(splitMe), d)
 
+    # Now split everything in the list (order is important!)
     if method == 'random':
         return skms.train_test_split(*splitMe, test_size=amt, random_state=seed)
-    elif method == 'chunk':
-        split = round(len(X) * (1-amt))
-        rtn = [(d.iloc[:split], d.iloc[split:]) for d in splitMe]
+    elif method in ('head', 'tail'):
+        rtn = []
+        for d in splitMe:
+            # Head an tail splitting are the same, just with opposite amts
+            split = round(len(d) * ((1-amt) if method == 'tail' else amt))
+            rtn += [d.iloc[:split], d.iloc[split:]]
+        return rtn
     else:
         raise TypeError(f"Invalid method parameter given")
 
