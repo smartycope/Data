@@ -485,7 +485,7 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
     else:
         raise TypeError(f"Bad method arguement '{method}' given to convert_numeric")
 
-def split(*data, amt=.2, method:Union['random', 'chunk', 'head', 'tail']='random', target=[], splitTargets=True, seed=42):
+def split(*data, amt=.2, method:Union['random', 'chunk', 'head', 'tail']='random', target=[], splitTargets=False, seed=42):
     """ Splits the given data, both into train/test sets, and by taking out targets at the same time
         `target` can be a string or an iterable
         If `splitTargets` is set to False, the targets will always return DataFrames, even if
@@ -514,8 +514,7 @@ def split(*data, amt=.2, method:Union['random', 'chunk', 'head', 'tail']='random
         else:
             splitMe.append(pd.DataFrame(dict(zip(ensureIterable(target), targets))))
         # It makes more sense to do data, then target, not target then data
-        # I think this should actually be -1... I'm not sure why -2 works...
-        splitMe.insert(-2 if len(targets) else len(splitMe), d)
+        splitMe.insert(0 if len(targets) else len(splitMe), d)
 
     # Now split everything in the list (order is important!)
     if method == 'random':
