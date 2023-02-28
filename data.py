@@ -66,17 +66,12 @@ def addVerbose(func):
             **kwargs)
     return inner
 
-def _cleaning_func(**kwargs):
+def _cleaning_func(**decorator_kwargs):
     """ Auto-converts the given named parameter to the given type
         Supports inputs of pd.DataFrame, pd.Series, np.ndarray, and tuple/list pd.Series or np.ndarray
         Supports outputs of pd.DataFrame, pd.Series, and a tuple of pd.Series
         Does NOT support input types of tuple/list of pd.DataFrames
     """
-    # Runs when the decorator is added
-    if len(kwargs) > 1:
-        raise TypeError('Please just use 1 decorator parameter with _cleaning_func')
-    paramName, outputType = list(kwargs.items())[0]
-
     trivial = lambda x: x
     def error(toType):
         def _error(x):
@@ -114,21 +109,22 @@ def _cleaning_func(**kwargs):
         @wraps(decorator_func)
         @addVerbose
         def inner(dat, *args, **kwargs):
-            # Runs when the decorated function gets called
-            if isinstance(dat, (list, tuple)):
-                if len(dat) == 0:
-                    raise TypeError(f'Please dont pass in an empty list')
-                elif len(dat) == 1:
-                    dat = dat[0]
-                # If we're given a collection of pd.DataFrames, then iterate through the function and
-                # apply it to all of them
-                elif isinstance(dat[0], pd.DataFrame):
-                    _kwargs = kwargs.copy()
-                    rtn = []
-                    for d in dat:
-                        _kwargs[paramName] = input2output[pd.DataFrame][outputType](d)
-                        rtn.append(decorator_func(*args, **kwargs))
-                    return rtn
+            for paramName, outputType in decorator_kwargs.items():
+                # Runs when the decorated function gets called
+                if isinstance(dat, (list, tuple)):
+                    if len(dat) == 0:
+                        raise TypeError(f'Please dont pass in an empty list')
+                    elif len(dat) == 1:
+                        dat = dat[0]
+                    # If we're given a collection of pd.DataFrames, then iterate through the function and
+                    # apply it to all of them
+                    elif isinstance(dat[0], pd.DataFrame):
+                        _kwargs = kwargs.copy()
+                        rtn = []
+                        for d in dat:
+                            _kwargs[paramName] = input2output[pd.DataFrame][outputType](d)
+                            rtn.append(decorator_func(*args, **kwargs))
+                        return rtn
 
             kwargs[paramName] = input2output[type(dat)][outputType](dat)
             return decorator_func(*args, **kwargs)
@@ -1184,6 +1180,7 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
 
+@_cleaning_function(test=pd.Series, testPredictions=pd.Series)
 def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=None, accuracy=3, explain=False, compact=False, line=False):
     """ Evaluate your predictions of an ML model.
         NOTE: compact overrides explain.
