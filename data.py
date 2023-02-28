@@ -5,7 +5,7 @@ from contextlib import redirect_stdout
 from imblearn.under_sampling import RandomUnderSampler
 from warnings import warn
 import random
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, median_absolute_error
 import sklearn
 from sklearn.preprocessing import MinMaxScaler
 from math import sqrt
@@ -115,6 +115,21 @@ def _cleaning_func(**kwargs):
         @addVerbose
         def inner(dat, *args, **kwargs):
             # Runs when the decorated function gets called
+            if isinstance(dat, (list, tuple)):
+                if len(dat) == 0:
+                    raise TypeError(f'Please dont pass in an empty list')
+                elif len(dat) == 1:
+                    dat = dat[0]
+                # If we're given a collection of pd.DataFrames, then iterate through the function and
+                # apply it to all of them
+                elif isinstance(dat[0], pd.DataFrame):
+                    _kwargs = kwargs.copy()
+                    rtn = []
+                    for d in dat:
+                        _kwargs[paramName] = input2output[pd.DataFrame][outputType](d)
+                        rtn.append(decorator_func(*args, **kwargs))
+                    return rtn
+
             kwargs[paramName] = input2output[type(dat)][outputType](dat)
             return decorator_func(*args, **kwargs)
         return inner
@@ -129,6 +144,26 @@ def insertSample(df, sample, index=-1):
 def ensureIterable(obj, useList=False):
     if not isiterable(obj):
         return [obj, ] if useList else (obj, )
+    else:
+        return obj
+
+def ensureNotIterable(obj, emptyBecomes=None):
+    if isiterable(obj):
+        # Generators are iterable, but don't inherantly have a length
+        try:
+            len(obj)
+        except:
+            obj = list(obj)
+
+        if len(obj) == 1:
+            try:
+                return obj[0]
+            except TypeError:
+                return list(obj)[0]
+        elif len(obj) == 0:
+            return obj if emptyBecomes is _None else emptyBecomes
+        else:
+            return obj
     else:
         return obj
 
@@ -1149,11 +1184,123 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
 
-def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False):
+def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=None, accuracy=3, explain=False, compact=False, line=False):
     """ Evaluate your predictions of an ML model.
         NOTE: compact overrides explain.
      """
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
+
+    def _score(name, func, explaination, _test=True, **kwargs):
+        name += ':'
+        if compact:
+            print(f'{name} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}', end='   ')
+        else:
+            # print('~'*20, func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs), '~'*20)
+            print(f'\t{name:<23} {ensureNotIterable(func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs)):,.{accuracy}f}')
+            if explain:
+                print('\t\t' + explaination)
+
+
+    def _quantatative(_test=True):
+        _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test, squared=False)
+        _score('My own measure',         lambda a, b, **k: mean_squared_error(a, b, **k) / a.mean(),  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.', _test, squared=False)
+        _score('Mean Absolute Error',    mean_absolute_error, 'Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.',             _test)
+        _score('Median Absolute Error',  median_absolute_error, '',             _test)
+        _score('R^2 Score',              r2_score,            'An average of how far off we are from just using the mean as a prediction. Larger is better.',          _test)
+        def amtInPercent(truth, pred, precent):
+            combined = pd.concat([truth, pred], axis=1)
+            combined.columns = ["truth", "pred"]
+            combined["absdiff"] = (combined["truth"] - combined["pred"]).abs()
+            combined["absdiff_pct"] = combined["absdiff"] / combined["truth"]
+            return len(combined[combined["absdiff_pct"] <= (percent / 100)]) / len(combined) * 100
+
+
+        for percent in (5, 10, 20, 50):
+            _score(f'Within {percent}%', lambda a, b, **k: amtInPercent(a, b, percent), f'How many of the samples are within {percent}% of their actual values', _test)
+
+
+    print('Test:')
+    _quantatative()
+    if train is not None and trainPredictions is not None:
+        print('\nTrain:')
+        _quantatative(False)
+
+    if line:
+        sns.set(rc={'figure.figsize':(11.7,8.27)})
+        color_dict = dict({'below 20%':'tab:blue',
+                            'above 20%': 'tab:orange'})
+
+        shower = pd.DataFrame(testPredictions)
+        shower.columns = ['predictions']
+        testfinal = pd.concat([shower, test], axis=1)
+        testfinal['difference'] = testfinal['actual']-testfinal['predictions']
+        testfinal['percent_difference'] = abs(testfinal['difference']/testfinal['actual'])
+        testfinal['percent_bucket'] = [ "above 20%" if i >= 0.2 else "below 20%" for i in testfinal.percent_difference ]
+
+        # print(testfinal['abspercentmiss'].describe(percentiles=[.1,.2,.3,.4,.5,.6,.7,.8,.9,.95]))
+        xlims=(0,1e3)
+        # ylims=(0,1e3)
+        ax = sns.scatterplot(data=testfinal,x='actual',y='predictions',hue="percent_bucket",palette=color_dict)
+        # ax.set(xscale="log", yscale="log", xlim=xlims, ylim=ylims)
+        ax.plot(xlims,xlims, color='r')
+        # ax.plot(color='r')
+        # plt.legend(labels=['perfect',"below 5",'above 5','10-20%','above 20'])
+        plt.show()
+
+evaluateQ = evaluateQuantitative
+
+def evaluateCatagorical(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False):
+    """ Evaluate your predictions of an ML model.
+        NOTE: compact overrides explain.
+     """
+    assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
+
+
+    def _score(name, func, explaination, _test=True, **kwargs):
+        name += ':'
+        if compact:
+            print(f'{name} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}', end='   ')
+        else:
+            print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
+            if explain:
+                print('\t\t' + explaination)
+
+
+    def _catagorical(_test=True):
+        _score('F1',        sklearn.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
+        _score('Accuracy',  sklearn.metrics.accuracy_score,  'Accuracy is a measure of how well the model did on average',                    _test)
+        _score('Precision', sklearn.metrics.precision_score, 'Precision is a measure of how many things we said were true and we were wrong', _test)
+        _score('Recall',    sklearn.metrics.recall_score,    'Recall is a measure of how many things we missed out on',                       _test)
+
+    print('Test:')
+    _catagorical()
+
+    if confusion:
+        ConfusionMatrixDisplay.from_predictions(test, testPredictions, cmap='Blues')
+        plt.show()
+    if curve:
+        PrecisionRecallDisplay.from_predictions(test, testPredictions)
+        plt.show()
+
+    if train is not None and trainPredictions is not None:
+        print('\nTrain:')
+        _catagorical(False)
+
+        if confusion:
+            ConfusionMatrixDisplay.from_predictions(train, trainPredictions, cmap='Blues')
+            plt.show()
+        if curve:
+            PrecisionRecallDisplay.from_predictions(train, trainPredictions)
+            plt.show()
+
+evaluateC = evaluateCatagorical
+
+def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False, line=False):
+    """ Evaluate your predictions of an ML model.
+        NOTE: compact overrides explain.
+     """
+    assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
+    raise DeprecationWarning('Please use evaluateQ or evaluateC instead')
 
     def _score(name, func, explaination, _test=True, **kwargs):
         name += ':'
@@ -1179,7 +1326,17 @@ def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=No
         _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test, squared=False)
         _score('My own measure',         lambda a, b, **k: mean_squared_error(a, b, **k) / a.mean(),  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.', _test, squared=False)
         _score('Mean Absolute Error',    mean_absolute_error, 'Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.',             _test)
+        _score('Median Absolute Error',  median_absolute_error, '',             _test)
         _score('R^2 Score',              r2_score,            'An average of how far off we are from just using the mean as a prediction. Larger is better.',          _test)
+        for percent in (5, 10, 20, 50):
+            _score(f'Within {percent}%', lambda a, b, **k: amtInPercent(a, b, percent), f'How many of the samples are within {percent}% of their actual values', _test)
+
+        def amtInPercent(truth, pred, precent):
+            combined = pd.concat([truth, pred], axis=1)
+            combined.columns = ["truth", "pred"]
+            combined["absdiff"] = (combined["truth"] - combined["pred"]).abs()
+            combined["absdiff_pct"] = combined["absdiff"] / combined["truth"]
+            return len(combined[combined["absdiff_pct"] <= (percent / 100)]) / len(combined) * 100
 
     # Catagorical measures
     if catagorical:
@@ -1211,7 +1368,32 @@ def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=No
         if train is not None and trainPredictions is not None:
             print('\nTrain:')
             _quantatative(False)
-fullTest = evaluate
+
+        if line:
+            sns.set(rc={'figure.figsize':(11.7,8.27)})
+            color_dict = dict({'below 20%':'tab:blue',
+                                'above 20%': 'tab:orange'})
+
+            shower = pd.DataFrame(student_ds, columns = ['predictions'])
+            shower.columns = ['predictions']
+            testfinal = pd.concat([shower,targets['actual']],axis=1)
+            testfinal['difference'] = testfinal['actual']-testfinal['predictions']
+            testfinal['percent_difference'] = abs(testfinal['difference']/testfinal['actual'])
+            testfinal['percent_bucket'] = [ "above 20%" if i >= 0.2 else "below 20%" for i in testfinal.percent_difference ]
+
+            # print(testfinal['abspercentmiss'].describe(percentiles=[.1,.2,.3,.4,.5,.6,.7,.8,.9,.95]))
+            # xlims=(0,1e3)
+            # # ylims=(0,1e3)
+            ax = sns.scatterplot(data=testfinal,x='actual',y='predictions',hue="percent_bucket",palette=color_dict)
+            # ax.set(xscale="log", yscale="log", xlim=xlims, ylim=ylims)
+            # ax.plot(xlims,xlims, color='r')
+            ax.plot(color='r')
+            # plt.legend(labels=['perfect',"below 5",'above 5','10-20%','above 20'])
+            plt.show()
+            print(f"-"*77)
+            print("\n"*3)
+
+
 
 """
 TODO: Add cross-validation to evaluate
@@ -1271,3 +1453,12 @@ def saveStats(file, name, model, testY, predY, trainY=None, trainPredY=None, not
             doit()
     if show:
         doit()
+
+def plot_history(history):
+    plt.figure()
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.plot(history['index'], history['loss'], label='Train Loss')
+    plt.plot(history['index'], history['val_loss'], label='Value Loss')
+    plt.legend()
+    plt.show()
