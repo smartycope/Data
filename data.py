@@ -1180,7 +1180,7 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
 
-@_cleaning_function(test=pd.Series, testPredictions=pd.Series)
+@_cleaning_func(test=pd.Series, testPredictions=pd.Series)
 def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=None, accuracy=3, explain=False, compact=False, line=False):
     """ Evaluate your predictions of an ML model.
         NOTE: compact overrides explain.
