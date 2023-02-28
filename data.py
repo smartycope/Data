@@ -1,5 +1,6 @@
 import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
+from functools import wraps
 from contextlib import redirect_stdout
 from imblearn.under_sampling import RandomUnderSampler
 from warnings import warn
@@ -45,10 +46,80 @@ _catagoricalTypes = ['bool', 'bool_', 'object', 'object_', 'Interval', 'bool8', 
 _quantitativeTypes = ['number']
 _timeTypes = ['datetimetz', 'timedelta', 'datetime']
 
+
 try:
     from Cope import todo
 except ImportError:
     todo = lambda *a: print('TODO: ', *a)
+
+
+# I AM THE COMPUTER GOBLIN
+#       FEAR ME
+def addVerbose(func):
+    # Runs when the decorator is added
+    @wraps(func)
+    def inner(*args, verbose=False, **kwargs):
+        # Runs when the decorated function gets called
+        return func(
+            *args,
+            log=lambda s: print(f'\t{s}') if verbose else None,
+            **kwargs)
+    return inner
+
+def _cleaning_func(**kwargs):
+    """ Auto-converts the given named parameter to the given type
+        Supports inputs of pd.DataFrame, pd.Series, np.ndarray, and tuple/list pd.Series or np.ndarray
+        Supports outputs of pd.DataFrame, pd.Series, and a tuple of pd.Series
+        Does NOT support input types of tuple/list of pd.DataFrames
+    """
+    # Runs when the decorator is added
+    if len(kwargs) > 1:
+        raise TypeError('Please just use 1 decorator parameter with _cleaning_func')
+    paramName, outputType = list(kwargs.items())[0]
+
+    trivial = lambda x: x
+    def error(toType):
+        def _error(x):
+            raise TypeError(f"Cant cast {toType} to {type(x)}")
+        return _error
+
+    iterableInput = {
+        pd.DataFrame: lambda t: pd.DataFrame(t).T,
+        pd.Series:    lambda t: (pd.Series(t[0]) if len(t) == 1 else error(pd.Series)(t)),
+        tuple:        lambda t: tuple([pd.Series(i) for i in t]),
+    }
+
+    input2output = {
+        pd.DataFrame: {
+            pd.DataFrame: trivial,
+            pd.Series:    error(pd.Series),
+            tuple:        lambda d: tuple([d[i] for i in d]),
+        },
+        pd.Series:    {
+            pd.DataFrame: lambda s: pd.DataFrame(s),
+            pd.Series:    trivial,
+            tuple:        lambda s: (s,),
+        },
+        np.ndarray:   {
+            pd.DataFrame: lambda n: pd.DataFrame(n),
+            pd.Series:    lambda n: pd.Series(n),
+            tuple:        lambda s: (pd.Series(s),),
+        },
+        tuple: iterableInput,
+        list:  iterableInput,
+    }
+
+    def outer(decorator_func):
+        # Also runs when the decorator is added
+        @wraps(decorator_func)
+        @addVerbose
+        def inner(dat, *args, **kwargs):
+            # Runs when the decorated function gets called
+            kwargs[paramName] = input2output[type(dat)][outputType](dat)
+            return decorator_func(*args, **kwargs)
+        return inner
+    return outer
+
 
 def insertSample(df, sample, index=-1):
     """ Because theres not a function for this? """
@@ -247,12 +318,12 @@ def interactWithOutliers(df, feature=None, step=.2):
     )
 
 # Clean Functions
-log = lambda s, v: print('\t' + s) if v else None
-def handle_outliers(col, method:Union['remove', 'constrain']='remove', zscore=3, verbose=False):
+@_cleaning_func(col=pd.Series)
+def handle_outliers(col, method:Union['remove', 'constrain']='remove', zscore=3, log=...):
     # TODO: add more options here (like getting outliers via kurtosis & IQR)
     samples = getOutliers(col, zscore=zscore)
     if method == 'remove':
-        log(f'Removing outliers with zscore magnitudes >{zscore} from {col.name}', verbose)
+        log(f'Removing outliers with zscore magnitudes >{zscore} from {col.name}')
         return col.drop(samples.index)
     elif method == 'constrain':
         todo('This breaks on negative values')
@@ -260,39 +331,40 @@ def handle_outliers(col, method:Union['remove', 'constrain']='remove', zscore=3,
         # The value that corresponds to a given score is the standard deviate * zscore
         max = col.std() * zscore
         # df.loc[samples.index, column] = np.clip(samples, -max, max)
-        log(f'Constraining outliers with zscore magnitudes >{zscore} from {col.name}', verbose)
+        log(f'Constraining outliers with zscore magnitudes >{zscore} from {col.name}')
         # col[samples.index] = np.clip(samples, -max, max)
         # col.mask()
         return col.apply(lambda s: np.clip(s, -max, max))
     else:
         raise TypeError(f"Invalid method arguement '{method}' given")
 
-def handle_missing(col, method:Union[pd.Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any], missing_value=np.nan, verbose=False):
+@_cleaning_func(col=pd.Series)
+def handle_missing(col, method:Union[pd.Series, 'remove', 'mean', 'median', 'mode', 'random', 'balanced_random', Any], missing_value=np.nan, log=...):
     without = col.loc[col != missing_value]
     # match options:
     if isinstance(method, (pd.Series, np.ndarray)):
         assert len(method) == len(col), 'Both arrays are not of the same length'
-        log(f'Replacing all samples with a "{col.name}" value of "{missing_value}" with their indexes in "{method.name}"', verbose)
+        log(f'Replacing all samples with a "{col.name}" value of "{missing_value}" with their indexes in "{method.name}"')
         # return col.apply(lambda sample: method[sample.index] if sample == missing_value else sample)
         return pd.Series([(method[i] if col[i] == missing_value else col[i]) for i in range(len(col))])
 
         # return pd.Series(col.reset_index().apply(lambda i: method[i] if col[i] == missing_value else col[i], axis=1).values, index=col.index)
         # return col.apply(lambda sample: method[sample.index] if sample == missing_value else sample)
     elif method == 'remove':
-        log(f'Removing all samples with "{col.name}" values of "{missing_value}"', verbose)
+        log(f'Removing all samples with "{col.name}" values of "{missing_value}"')
         return without
     elif method == 'mean':
         if isCatagorical(col):
             raise TypeError(f"Cannot get mean of a catagorical feature")
         mean = without.mean()
-        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the mean ({mean:.2f})', verbose)
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the mean ({mean:.2f})')
         # Copy it for consistency
         return col.copy().mask(col == missing_value, mean)
     elif method == 'median':
         if isCatagorical(col):
             raise TypeError(f"Cannot get median of a catagorical feature")
         median = without.median()
-        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the median ({median})', verbose)
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the median ({median})')
         return col.copy().mask(col == missing_value, median)
     elif method == 'mode':
         # I'm not sure how else to pick a mode, so just pick one at random
@@ -302,27 +374,27 @@ def handle_missing(col, method:Union[pd.Series, 'remove', 'mean', 'median', 'mod
             mode = without.mode()[0]
         elif MODE_SELECTION == 'last':
             mode = without.mode()[-1]
-        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to a mode ({mode})', verbose)
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to a mode ({mode})')
         return col.copy().mask(col == missing_value, mode)
     elif method == 'random':
         if isCatagorical(col):
-            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random catagories', verbose)
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random catagories')
             fill = lambda sample: random.choice(without.unique()) if sample == missing_value else sample
         else:
-            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random values along a uniform distrobution', verbose)
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random values along a uniform distrobution')
             fill = lambda sample: type(sample)(random.uniform(without.min(), without.max())) if sample == missing_value else sample
 
             return col.apply(fill)
     elif method == 'balanced_random':
         if isCatagorical(col):
-            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to evenly distributed random catagories', verbose)
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to evenly distributed random catagories')
             fill = lambda sample: random.choice(without) if sample == missing_value else sample
         else:
-            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random values along a normal distrobution', verbose)
+            log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to random values along a normal distrobution')
             fill = lambda sample: type(sample)(random.gauss(without.mean(), without.std())) if sample == missing_value else sample
         return col.apply(fill)
     else:
-        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to {method}', verbose)
+        log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to {method}')
         # col.loc[col == missing_value] = method
         return col.copy().mask(col == missing_value, method)
     return col
@@ -330,23 +402,23 @@ def handle_missing(col, method:Union[pd.Series, 'remove', 'mean', 'median', 'mod
 def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remove', 'new', 'mean', 'median', 'mode', 'random', 'balanced_random', Any], true=1, false=0, verbose=False):
     df = df.copy()
     if isinstance(method, pd.Series):
-        log(f'Changing all samples where "{query}" is true to have the {column} values of their indecies in "{method.name}"', verbose)
+        log(f'Changing all samples where "{query}" is true to have the {column} values of their indecies in "{method.name}"')
         q = df.query(query)
         df.loc[q.index, column] = q.apply(lambda s: method[s.name], axis=1)
     elif method == 'remove':
-        log(f'Removing all samples where "{query}" is true', verbose)
+        log(f'Removing all samples where "{query}" is true')
         df = df.drop(df.query(query).index)
     elif method == 'mean':
         if isCatagorical(df[column]):
             raise TypeError(f"Cannot get mean of a catagorical feature")
         mean = df[column].mean()
-        log(f'Setting all samples where {query} is true to the mean of "{column}" ({mean:.2})', verbose)
+        log(f'Setting all samples where {query} is true to the mean of "{column}" ({mean:.2})')
         df.loc[df.query(query).index, column] = mean
     elif method == 'median':
         if isCatagorical(df[column]):
             raise TypeError(f"Cannot get median of a catagorical feature")
         median = df[column].median()
-        log(f'Setting all samples where "{query}" is true to the median of "{column}" ({median})', verbose)
+        log(f'Setting all samples where "{query}" is true to the median of "{column}" ({median})')
         df.loc[df.query(query).index, column] = median
     elif method == 'mode':
         # I'm not sure how else to pick a mode, so just pick one at random
@@ -356,14 +428,14 @@ def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remov
             mode = df[column].mode()[0]
         elif MODE_SELECTION == 'last':
             mode = df[column].mode()[-1]
-        log(f'Setting all samples where "{query}" is true to a mode of "{column}" ({mode})', verbose)
+        log(f'Setting all samples where "{query}" is true to a mode of "{column}" ({mode})')
         df.loc[df.query(query).index, column] = mode
     elif method == 'random':
         if isCatagorical(df[column]):
-            log(f'Setting all samples where "{query}" is true to have random catagories', verbose)
+            log(f'Setting all samples where "{query}" is true to have random catagories')
             fill = lambda s: random.choice(df[column].unique())
         else:
-            log(f'Setting all samples where "{query}" is true to have random values along a uniform distrobution', verbose)
+            log(f'Setting all samples where "{query}" is true to have random values along a uniform distrobution')
             fill = lambda s: type(s)(random.uniform(df[column].min(), df[column].max()))
 
         q = df.query(query)
@@ -374,61 +446,49 @@ def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remov
         df.loc[q.index, column] = true
     elif method == 'balanced_random':
         if isCatagorical(df[column]):
-            log(f'Setting all samples where "{query}" is true to have evenly distributed random catagories', verbose)
+            log(f'Setting all samples where "{query}" is true to have evenly distributed random catagories')
             fill = lambda s: random.choice(df[column])
         else:
-            log(f'Setting all samples where "{query}" is true to have random values along a normal distrobution', verbose)
+            log(f'Setting all samples where "{query}" is true to have random values along a normal distrobution')
             fill = lambda s: type(s)(random.gauss(df[column].mean(), df[column].std()))
 
         q = df.query(query)
         df.loc[q.index, column] = q[column].apply(fill)
     else:
-        log(f'Setting all samples where "{query}" is true to have a "{column}" value of  {method}', verbose)
+        log(f'Setting all samples where "{query}" is true to have a "{column}" value of  {method}')
         df.loc[df.query(query).index, column] = method
     return df
 
-def remove(col, val, verbose=False):
-    log(f'Removing all samples with a "{col.name}" value of {val}', verbose)
+@_cleaning_func(col=pd.Series)
+def remove(col, val, log=...):
+    log(f'Removing all samples with a "{col.name}" value of {val}')
     # return col.mask(col == val, val)
     return col.drop(index=col[col == val].index)
 
-def bin(col, method:Union['frequency', 'width', Tuple, List], amt=5, verbose=False):
+@_cleaning_func(col=pd.Series)
+def bin(col, method:Union['frequency', 'width', Tuple, List], amt=5, log=...):
     if isCatagorical(col):
         raise TypeError(f"Can't bin catagorical feature '{col.name}'")
 
     if   method == 'frequency':
-        log(f'Binning "{col.name}" by frequency into {amt} bins', verbose)
+        log(f'Binning "{col.name}" by frequency into {amt} bins')
         return pd.qcut(col, amt, duplicates='drop')
     elif method == 'width':
-        log(f'Binning "{col.name}" by width into {amt} bins', verbose)
+        log(f'Binning "{col.name}" by width into {amt} bins')
         raise NotImplementedError('Width binning')
     elif isinstance(method, (tuple, list)):
-        log(f'Custom binning "{col.name}" into {len(method)} bins', verbose)
+        log(f'Custom binning "{col.name}" into {len(method)} bins')
         return pd.cut(col, method)
     else:
         raise TypeError(f"Bin method parameter given invalid option {method}")
 
-def rescale(col, method='sklearn', verbose=False):
-    name = col.name if isinstance(col, pd.Series) else 'DataFrame'
-    if  method == 'min-max':
-        log(f'Normalizing "{name}" by min-max method', verbose)
-        if isisntace(col, pd.DataFrame):
-            raise TypeError('Only single Series normalizing is implemented right now, not a whole DataFrame. Try using the sklearn method')
-        return (col-col.min()) / (col.max()-col.min())
-    elif method == 'sklearn':
-        log(f'Normalizing "{name}" by min-max method', verbose)
-        if isinstance(col, pd.Series):
-            return pd.Series(MinMaxScaler().fit_transform(col.values.reshape(-1,1)).T[0])
-        else:
-            return pd.DataFrame(MinMaxScaler().fit_transform(col), columns=col.columns)
-    elif method == 'range':
-        log(f'Normalizing "{name}" by range method', verbose)
-        raise NotImplementedError(f'range normalization doesn\'t work yet')
-        return (col-col.mean()) / col.std()
-    else:
-        raise TypeError('Invalid method argument given')
-# For backwards compatibility
-normalize = rescale
+@_cleaning_func(df=pd.DataFrame)
+def rescale(df, return_scaler=False, log=...):
+    log(f'Rescaling')
+    # display(df)
+    scaler = MinMaxScaler().fit(df)
+    ans = pd.DataFrame(scaler.transform(df), columns=df.columns)
+    return (ans, scaler) if return_scaler else ans
 
 def convert_time(df_or_col, col:str=None, method:Union['timestamp']='timestamp', verbose=False):
     assert not (isinstance(df_or_col, pd.Series) and col is not None), 'Please dont provide a col parameter if passing a Series'
@@ -528,14 +588,6 @@ def split(*data, amt=.2, method:Union['random', 'chunk', 'head', 'tail']='random
         return rtn
     else:
         raise TypeError(f"Invalid method parameter given")
-
-
-# def parse_date(col, format='', verbose=False):
-#     assert isinstance(col, pd.Series), 'Please pass in a Series'
-#     log(f'Parsing {col.name} as dates ', verbose)
-#     # return pd.Series(pd.DatetimeIndex(col))
-#     return pd.to_datetime(col, format=format)
-# parseDate = parse_date
 
 # The main functions
 def explore(data,
@@ -1038,6 +1090,7 @@ def clean(df:pd.DataFrame,
                     },
                 }
     """
+    raise DeprecationWarning('This function is no longer supported and is likely to break')
     df = df.copy()
     log = lambda s: print(s) if verbose else None
 
