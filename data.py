@@ -87,7 +87,7 @@ def _cleaning_func(**decorator_kwargs):
     input2output = {
         pd.DataFrame: {
             pd.DataFrame: trivial,
-            pd.Series:    error(pd.Series),
+            pd.Series:    lambda d: pd.Series(d.iloc[:,0]) if len(d.columns) == 1 else error(pd.Series),
             tuple:        lambda d: tuple([d[i] for i in d]),
         },
         pd.Series:    {
@@ -126,8 +126,8 @@ def _cleaning_func(**decorator_kwargs):
                             rtn.append(decorator_func(*args, **kwargs))
                         return rtn
 
-            kwargs[paramName] = input2output[type(dat)][outputType](dat)
-            return decorator_func(*args, **kwargs)
+                kwargs[paramName] = input2output[type(dat)][outputType](dat)
+                return decorator_func(*args, **kwargs)
         return inner
     return outer
 
@@ -1180,12 +1180,14 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
 
-@_cleaning_func(test=pd.Series, testPredictions=pd.Series)
-def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=None, accuracy=3, explain=False, compact=False, line=False):
+@_cleaning_func(testPredictions=pd.Series, test=pd.Series)
+def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=None, accuracy=3, explain=False, compact=False, line=False, log=...):
     """ Evaluate your predictions of an ML model.
         NOTE: compact overrides explain.
      """
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
+    # display(test)
+    # display(testPredictions)
 
     def _score(name, func, explaination, _test=True, **kwargs):
         name += ':'
@@ -1224,20 +1226,25 @@ def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=Non
 
     if line:
         sns.set(rc={'figure.figsize':(11.7,8.27)})
-        color_dict = dict({'below 20%':'tab:blue',
-                            'above 20%': 'tab:orange'})
+        color_dict = dict({'below 20%':'tab:blue', 'above 20%': 'tab:orange'})
 
-        shower = pd.DataFrame(testPredictions)
-        shower.columns = ['predictions']
-        testfinal = pd.concat([shower, test], axis=1)
-        testfinal['difference'] = testfinal['actual']-testfinal['predictions']
-        testfinal['percent_difference'] = abs(testfinal['difference']/testfinal['actual'])
-        testfinal['percent_bucket'] = [ "above 20%" if i >= 0.2 else "below 20%" for i in testfinal.percent_difference ]
+        delta = test - testPredictions
+        display(testPredictions)
+        display(test)
+        display(delta)
+        testfinal = pd.DataFrame({
+            'Predictions': testPredictions,
+            'Ground Truth': test,
+            'difference': delta,
+            'percent_difference': abs(delta/test),
+            # 'percent_bucket': (test - testPredictions).abs() / test <= (percent / 100)#[ "above 20%" if i >= 0.2 else "below 20%" for i in testfinal.percent_difference ],
+
+        })
 
         # print(testfinal['abspercentmiss'].describe(percentiles=[.1,.2,.3,.4,.5,.6,.7,.8,.9,.95]))
         xlims=(0,1e3)
         # ylims=(0,1e3)
-        ax = sns.scatterplot(data=testfinal,x='actual',y='predictions',hue="percent_bucket",palette=color_dict)
+        ax = sns.scatterplot(data=testfinal,x='actual',y='predictions',hue="percent_difference",palette=color_dict)
         # ax.set(xscale="log", yscale="log", xlim=xlims, ylim=ylims)
         ax.plot(xlims,xlims, color='r')
         # ax.plot(color='r')
