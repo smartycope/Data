@@ -109,25 +109,26 @@ def _cleaning_func(**decorator_kwargs):
         @wraps(decorator_func)
         @addVerbose
         def inner(dat, *args, **kwargs):
-            for paramName, outputType in decorator_kwargs.items():
-                # Runs when the decorated function gets called
-                if isinstance(dat, (list, tuple)):
-                    if len(dat) == 0:
-                        raise TypeError(f'Please dont pass in an empty list')
-                    elif len(dat) == 1:
-                        dat = dat[0]
-                    # If we're given a collection of pd.DataFrames, then iterate through the function and
-                    # apply it to all of them
-                    elif isinstance(dat[0], pd.DataFrame):
-                        _kwargs = kwargs.copy()
-                        rtn = []
-                        for d in dat:
+            # Runs when the decorated function gets called
+            if isinstance(dat, (list, tuple)):
+                if len(dat) == 0:
+                    raise TypeError(f'Please dont pass in an empty list')
+                elif len(dat) == 1:
+                    dat = dat[0]
+                # If we're given a collection of pd.DataFrames, then iterate through the function and
+                # apply it to all of them
+                elif isinstance(dat[0], pd.DataFrame):
+                    _kwargs = kwargs.copy()
+                    rtn = []
+                    for d in dat:
+                        for paramName, outputType in decorator_kwargs.items():
                             _kwargs[paramName] = input2output[pd.DataFrame][outputType](d)
-                            rtn.append(decorator_func(*args, **kwargs))
-                        return rtn
+                        rtn.append(decorator_func(*args, **kwargs))
+                    return rtn
 
+            for paramName, outputType in decorator_kwargs.items():
                 kwargs[paramName] = input2output[type(dat)][outputType](dat)
-                return decorator_func(*args, **kwargs)
+            return decorator_func(*args, **kwargs)
         return inner
     return outer
 
@@ -1180,7 +1181,8 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     else:
         raise TypeError(f"Invalid method arguement given")
 
-@_cleaning_func(testPredictions=pd.Series, test=pd.Series)
+# @_cleaning_func(test=pd.Series)
+@_cleaning_func(testPredictions=pd.Series)
 def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=None, accuracy=3, explain=False, compact=False, line=False, log=...):
     """ Evaluate your predictions of an ML model.
         NOTE: compact overrides explain.
@@ -1188,6 +1190,9 @@ def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=Non
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
     # display(test)
     # display(testPredictions)
+    # @_cleaning_func() SHOULD handle this
+    test = pd.Series(test)
+    testPredictions = pd.Series(testPredictions)
 
     def _score(name, func, explaination, _test=True, **kwargs):
         name += ':'
@@ -1199,24 +1204,18 @@ def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=Non
             if explain:
                 print('\t\t' + explaination)
 
-
     def _quantatative(_test=True):
         _score('Root Mean Square Error', mean_squared_error,  'An average of how far off we are from the target, in the same units as the target. Smaller is better.', _test, squared=False)
         _score('My own measure',         lambda a, b, **k: mean_squared_error(a, b, **k) / a.mean(),  'Root mean square / average value. Eliminates the domain a bit. Smaller is better.', _test, squared=False)
         _score('Mean Absolute Error',    mean_absolute_error, 'Similar to Root Mean Square Error, but better at weeding out outliers. Smaller is better.',             _test)
         _score('Median Absolute Error',  median_absolute_error, '',             _test)
         _score('R^2 Score',              r2_score,            'An average of how far off we are from just using the mean as a prediction. Larger is better.',          _test)
-        def amtInPercent(truth, pred, precent):
-            combined = pd.concat([truth, pred], axis=1)
-            combined.columns = ["truth", "pred"]
-            combined["absdiff"] = (combined["truth"] - combined["pred"]).abs()
-            combined["absdiff_pct"] = combined["absdiff"] / combined["truth"]
-            return len(combined[combined["absdiff_pct"] <= (percent / 100)]) / len(combined) * 100
 
+        def amtInPercent(truth, pred, precent):
+            return ((truth - pred).abs() / truth <= (percent / 100)).values.sum() / len(truth) * 100
 
         for percent in (5, 10, 20, 50):
             _score(f'Within {percent}%', lambda a, b, **k: amtInPercent(a, b, percent), f'How many of the samples are within {percent}% of their actual values', _test)
-
 
     print('Test:')
     _quantatative()
@@ -1226,25 +1225,44 @@ def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=Non
 
     if line:
         sns.set(rc={'figure.figsize':(11.7,8.27)})
-        color_dict = dict({'below 20%':'tab:blue', 'above 20%': 'tab:orange'})
 
         delta = test - testPredictions
-        display(testPredictions)
-        display(test)
-        display(delta)
+        # display(testPredictions)
+        # display(test)
+        # display(delta)
         testfinal = pd.DataFrame({
             'Predictions': testPredictions,
             'Ground Truth': test,
             'difference': delta,
             'percent_difference': abs(delta/test),
             # 'percent_bucket': (test - testPredictions).abs() / test <= (percent / 100)#[ "above 20%" if i >= 0.2 else "below 20%" for i in testfinal.percent_difference ],
-
         })
+        testfinal['percent_difference'] = bin(testfinal['percent_difference'], method=(0, .05, .10, .20, .50, 1))
+        # display(testfinal['percent_difference'].iloc[0] == pd.Interval(0.5, 1.0, closed='right'))
+        # display(testfinal['percent_difference'])
+
+        testfinal['percent_difference'] = testfinal['percent_difference'].replace({
+            pd.Interval(0, .05, closed='right'): 'Within 5%',
+            pd.Interval(.05, .1, closed='right'): 'Within 10%',
+            pd.Interval(.1, .2, closed='right'): 'Within 20%',
+            pd.Interval(.2, .5, closed='right'): 'Within 50%',
+            pd.Interval(0.5, 1.0, closed='right'): 'Within 100%',
+        })
+        # display(testfinal['percent_difference'])
+        color_dict = dict({
+            'Within 5%': 'tab:green',
+            'Within 10%': 'tab:green',
+            'Within 20%': 'tab:blue',
+            'Within 50%': 'tab:orange',
+            'Within 100%': 'tab:red',
+            np.NaN: 'tab:red'
+        })
+        # Interval(0.5, 1.0, closed='right'), Interval(0.05, 0.1, closed='right'), Interval(0.2, 0.5, closed='right'), Interval(0.0, 0.05, closed='right'), Interval(0.1, 0.2, closed='right')
 
         # print(testfinal['abspercentmiss'].describe(percentiles=[.1,.2,.3,.4,.5,.6,.7,.8,.9,.95]))
         xlims=(0,1e3)
         # ylims=(0,1e3)
-        ax = sns.scatterplot(data=testfinal,x='actual',y='predictions',hue="percent_difference",palette=color_dict)
+        ax = sns.scatterplot(data=testfinal,x='Ground Truth',y='Predictions',hue="percent_difference",palette=color_dict)
         # ax.set(xscale="log", yscale="log", xlim=xlims, ylim=ylims)
         ax.plot(xlims,xlims, color='r')
         # ax.plot(color='r')
