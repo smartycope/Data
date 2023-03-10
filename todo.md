@@ -1,5 +1,6 @@
-# Quick Summary
-- add feature specific graphs under the features menu
+# Explore
+- Fix the R^2 bug in evaluateQ!
+- add feature specific boxplots under the features menu
 - add hue to matrix graph
 - bin quantative features and graph them as a histogram?
 - Add titles to graphs
@@ -10,7 +11,6 @@
 - in base summary tab, get the initial target range (ie without doing anything, we can get x% yes)
 - maybe make a target-target parameter? (the value we're looking for target to be?)
 - make jupyter tabs/accordian work??
-- Make the background not white -- general styling
 - add a loading bar for matrix plot and other plots
 - add an entropy threshold option
 - add these to the feature specific menu:
@@ -25,9 +25,10 @@
     - Check for duplicate samples
 - add boxplots
 - add counts of quantative features
-
-# SuggestedCleaning
-- A function that does a bunch of math and returns a suggested clean config
+- maybe in features add the head of that feature?
+- add boxplots
+- Make the background not white -- general styling
+- make plot labels diagonal
 
 # Clean
 - converting date/time type to "days since \[param]"
@@ -42,6 +43,7 @@
 - add inplace parameters to all the functions (and maybe have them defualt to True?)
 - add a parameter in convert_numeric() to include time types
 - add actually normalization to rescale
+- chunk split at multiple points
 
 # Resample
 - Add mixed option (and a tradeoff parameter)
@@ -54,6 +56,8 @@
     - RMSE
     - Use this for reference:
         - https://colab.research.google.com/github/byui-cse/cse450-course/blob/master/notebooks/module03_housing_grading_mini.ipynb
+
+# Tests for **EVERYTHING**
 
 
 - useful function: from calendar import month_abbr
@@ -68,14 +72,12 @@
 
 
 
-- sns.heatmap of correlations is WAY better
 
-RandomizedSearchCV()
-    - give ranges
-    - params = RandomizedSearchCV.best_estimator_.get_params()
+
+
+- sns.heatmap of correlations is WAY better
 
 - order of the columns matter in xgboost
     - shuffle order of features when randomizing
-
 
 - Explain extreme outliers

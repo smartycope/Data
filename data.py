@@ -19,7 +19,7 @@ import numpy as np
 from enum import Enum
 from sklearn.metrics import PrecisionRecallDisplay, ConfusionMatrixDisplay
 import ipywidgets as widgets
-from typing import Union, Callable, Iterable
+from typing import Union, Callable, Iterable, Literal
 from collections import OrderedDict
 from sympy import Integer, Float
 from IPython.display import clear_output, display
@@ -51,6 +51,19 @@ try:
     from Cope import todo
 except ImportError:
     todo = lambda *a: print('TODO: ', *a)
+
+
+
+# I got tired of MinMaxScaler returning numpy arrays
+def _cast2dataframe(func):
+    def wrapper(self, *args, **kwargs):
+        return pd.DataFrame(func(self, *args, **kwargs), columns=self.feature_names_in_)
+    return wrapper
+
+MinMaxScaler.transform = _cast2dataframe(MinMaxScaler.transform)
+
+
+
 
 
 # I AM THE COMPUTER GOBLIN
@@ -734,6 +747,8 @@ def explore(data,
         # Clear the output (because colab doesn't automatically or something?)
         clear_output(wait=True)
 
+        plt.xticks(rotation=45)
+
         # match page:
         if   page == 'Description':
                 print(f'There are {len(data):,} samples, with {len(data.columns)} columns:')
@@ -1268,7 +1283,6 @@ def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=Non
         # ax.plot(color='r')
         # plt.legend(labels=['perfect',"below 5",'above 5','10-20%','above 20'])
         plt.show()
-
 evaluateQ = evaluateQuantitative
 
 def evaluateCatagorical(test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False):
@@ -1289,7 +1303,11 @@ def evaluateCatagorical(test, testPredictions, train=None, trainPredictions=None
 
 
     def _catagorical(_test=True):
-        _score('F1',        sklearn.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
+        # Can't do an F1 score with more than 2 classes
+        try:
+            _score('F1',        sklearn.metrics.f1_score,        'F1 is essentially an averaged score combining precision and recall',            _test)
+        except ValueError:
+            pass
         _score('Accuracy',  sklearn.metrics.accuracy_score,  'Accuracy is a measure of how well the model did on average',                    _test)
         _score('Precision', sklearn.metrics.precision_score, 'Precision is a measure of how many things we said were true and we were wrong', _test)
         _score('Recall',    sklearn.metrics.recall_score,    'Recall is a measure of how many things we missed out on',                       _test)
@@ -1314,7 +1332,6 @@ def evaluateCatagorical(test, testPredictions, train=None, trainPredictions=None
         if curve:
             PrecisionRecallDisplay.from_predictions(train, trainPredictions)
             plt.show()
-
 evaluateC = evaluateCatagorical
 
 def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=None, accuracy=3, curve=False, confusion=False, explain=False, compact=False, line=False):
