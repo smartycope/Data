@@ -644,6 +644,9 @@ def explore(data,
             entropy=None,
             start='Description',
             startFeature=None,
+            startx=None,
+            starty=None,
+            startHue=None,
             alpha=None,
     ):
     # Parse params and make sure all the params are valid
@@ -705,19 +708,19 @@ def explore(data,
     featureBox.layout.visibility = 'hidden'
     featureABox = widgets.Dropdown(
         options=list(data.columns),
-                    value=startFeature,
+                    value=startx if startx is not None else startFeature,
                     description='x',
         )
     featureABox.layout.visibility = 'hidden'
     featureBBox = widgets.Dropdown(
         options=list(data.columns),
-                    value=startFeature,
+                    value=starty if starty is not None else startFeature,
                     description='y',
         )
     featureBBox.layout.visibility = 'hidden'
     featureHueBox = widgets.Dropdown(
         options=list(data.columns) + ['None'],
-                    value='None',
+                    value=startHue if startHue is not None else 'None',
                     description='hue',
         )
     featureHueBox.layout.visibility = 'hidden'
