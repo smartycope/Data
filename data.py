@@ -1,30 +1,52 @@
-import pandas as pd
-from imblearn.over_sampling import RandomOverSampler
-from functools import wraps
-from contextlib import redirect_stdout
-from imblearn.under_sampling import RandomUnderSampler
-from warnings import warn
-import random
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, median_absolute_error
-import sklearn
-from sklearn.preprocessing import MinMaxScaler
-from math import sqrt
-import seaborn as sns
-# from scipy.stats import entropy as _entropy
-# from scipy.stats import kurtosis
-import scipy.stats
-import matplotlib.pyplot as plt
-from typing import Optional, Any, Tuple, List, Iterable, Dict, Union
-import numpy as np
-from enum import Enum
-from sklearn.metrics import PrecisionRecallDisplay, ConfusionMatrixDisplay
-import ipywidgets as widgets
-from typing import Union, Callable, Iterable, Literal
-from collections import OrderedDict
-from sympy import Integer, Float
-from IPython.display import clear_output, display
-from math import log, e
-import sklearn.model_selection as skms
+def installLibs(libs=['pandas', 'numpy', 'imblearn', 'ipywidgets', 'seaborn', 'scipy', 'matplotlib']):
+    libs = ' '.join(libs)
+    def useSubprocess():
+        import subprocess
+        print(subprocess.check_output(f"pip install {libs}", shell=True, text=True))
+
+    try:
+        import IPython
+    except:
+        useSubprocess()
+    else:
+        if (ipython := IPython.get_ipython()) is not None:
+            ipython.run_line_magic("pip", f"install {libs}")
+        else:
+            useSubprocess()
+
+try:
+    import pandas as pd
+    from imblearn.over_sampling import RandomOverSampler
+    from functools import wraps
+    from contextlib import redirect_stdout
+    from imblearn.under_sampling import RandomUnderSampler
+    from warnings import warn
+    import random
+    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, median_absolute_error
+    import sklearn
+    from sklearn.preprocessing import MinMaxScaler
+    from math import sqrt
+    import seaborn as sns
+    # from scipy.stats import entropy as _entropy
+    # from scipy.stats import kurtosis
+    import scipy.stats
+    import matplotlib.pyplot as plt
+    from typing import Optional, Any, Tuple, List, Iterable, Dict, Union
+    import numpy as np
+    from enum import Enum
+    from sklearn.metrics import PrecisionRecallDisplay, ConfusionMatrixDisplay
+    import ipywidgets as widgets
+    from typing import Union, Callable, Iterable, Literal
+    from collections import OrderedDict
+    from sympy import Integer, Float
+    from IPython.display import clear_output, display
+    from math import log, e
+    import sklearn.model_selection as skms
+except ImportError:
+    if input("It seems one or more libraries are not installed. Would you like to auto-install them? (Y/n): ").lower() == 'y':
+        installLibs()
+
+
 
 # If there's mutliple modes, how do we want to choose one? Used in _cleanColumn
 # options: 'random', 'first', 'last'
@@ -62,9 +84,8 @@ def _cast2dataframe(func):
 
 MinMaxScaler.transform = _cast2dataframe(MinMaxScaler.transform)
 
-def installDependancies(optional=True):
-    libs = 'pandas numpy imblearn ipywidgets seaborn scipy matplotlib IPython'
-    optLibs = 'clipboard scinot sympy varname'
+def installLibs(libs=['pandas', 'numpy', 'imblearn', 'ipywidgets', 'seaborn', 'scipy', 'matplotlib']):
+    libs = ' '.join(libs)
     try:
         import IPython
     except:
@@ -72,8 +93,6 @@ def installDependancies(optional=True):
 
     if (ipython := IPython.get_ipython()) is not None:
         ipython.run_line_magic("pip", f"install {libs}")
-        if optional:
-            ipython.run_line_magic("pip", f"install {optLibs}")
     else:
         print('You dont seem to be calling from IPython. Simply run `pip install pandas altair numpy imblearn ipywidgets seaborn scipy matplotlib IPython` in a terminal')
 
