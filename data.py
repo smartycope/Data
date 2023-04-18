@@ -62,7 +62,20 @@ def _cast2dataframe(func):
 
 MinMaxScaler.transform = _cast2dataframe(MinMaxScaler.transform)
 
+def installDependancies(optional=True):
+    libs = 'pandas numpy imblearn ipywidgets seaborn scipy matplotlib IPython'
+    optLibs = 'clipboard scinot sympy varname'
+    try:
+        import IPython
+    except:
+        print(f'IPython doesnt seem to be installed. Simply run `pip install {libs}` in a terminal')
 
+    if (ipython := IPython.get_ipython()) is not None:
+        ipython.run_line_magic("pip", f"install {libs}")
+        if optional:
+            ipython.run_line_magic("pip", f"install {optLibs}")
+    else:
+        print('You dont seem to be calling from IPython. Simply run `pip install pandas altair numpy imblearn ipywidgets seaborn scipy matplotlib IPython` in a terminal')
 
 
 
