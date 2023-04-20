@@ -1,0 +1,14 @@
+LICENSE
+LICENSE-APACHE
+LICENSE-MIT
+MANIFEST.in
+README.md
+pyproject.toml
+setup.py
+datalibs/__init__.py
+datalibs/data.py
+datalibs.egg-info/PKG-INFO
+datalibs.egg-info/SOURCES.txt
+datalibs.egg-info/dependency_links.txt
+datalibs.egg-info/requires.txt
+datalibs.egg-info/top_level.txt

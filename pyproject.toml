@@ -1,0 +1,25 @@
+[metadata]
+name = 'datalibs'
+version = '1.1.1'
+description = 'A bunch of functions useful for data science (mostly wrappers around other libraries)'
+author = 'Copeland Carter'
+author_email = 'smartycope@gmail.com'
+license = 'MIT/Apache-2.0'
+url = 'https://github.com/smartycope/Data'
+
+[requires]
+python_version = ['3.10', '3.11', '3.6', '3.7', '3.8', 'pypy', 'pypy3']
+
+[build-system]
+requires = ['setuptools', 'wheel']
+
+[tool.hatch.commands]
+prerelease = 'hatch build'
+
+[project]
+name = 'datalibs'
+version = '1.1.1'
+description = 'A bunch of functions useful for data science (mostly wrappers around other libraries)'
+dependencies = [
+  'pandas', 'numpy', 'imblearn', 'ipywidgets', 'seaborn', 'scipy', 'matplotlib',
+]

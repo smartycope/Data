@@ -1,52 +1,26 @@
-def installLibs(libs=['pandas', 'numpy', 'imblearn', 'ipywidgets', 'seaborn', 'scipy', 'matplotlib']):
-    libs = ' '.join(libs)
-    def useSubprocess():
-        import subprocess
-        print(subprocess.check_output(f"pip install {libs}", shell=True, text=True))
-
-    try:
-        import IPython
-    except:
-        useSubprocess()
-    else:
-        if (ipython := IPython.get_ipython()) is not None:
-            ipython.run_line_magic("pip", f"install {libs}")
-        else:
-            useSubprocess()
-
-try:
-    import pandas as pd
-    from imblearn.over_sampling import RandomOverSampler
-    from functools import wraps
-    from contextlib import redirect_stdout
-    from imblearn.under_sampling import RandomUnderSampler
-    from warnings import warn
-    import random
-    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, median_absolute_error
-    import sklearn
-    from sklearn.preprocessing import MinMaxScaler
-    from math import sqrt
-    import seaborn as sns
-    # from scipy.stats import entropy as _entropy
-    # from scipy.stats import kurtosis
-    import scipy.stats
-    import matplotlib.pyplot as plt
-    from typing import Optional, Any, Tuple, List, Iterable, Dict, Union
-    import numpy as np
-    from enum import Enum
-    from sklearn.metrics import PrecisionRecallDisplay, ConfusionMatrixDisplay
-    import ipywidgets as widgets
-    from typing import Union, Callable, Iterable, Literal
-    from collections import OrderedDict
-    from sympy import Integer, Float
-    from IPython.display import clear_output, display
-    from math import log, e
-    import sklearn.model_selection as skms
-except ImportError:
-    if input("It seems one or more libraries are not installed. Would you like to auto-install them? (Y/n): ").lower() == 'y':
-        installLibs()
-
-
+import pandas as pd
+from imblearn.over_sampling import RandomOverSampler
+from functools import wraps
+from contextlib import redirect_stdout
+from imblearn.under_sampling import RandomUnderSampler
+from warnings import warn
+import random
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, median_absolute_error
+import sklearn
+from sklearn.preprocessing import MinMaxScaler
+import seaborn as sns
+# from scipy.stats import entropy as _entropy
+# from scipy.stats import kurtosis
+import scipy.stats
+import matplotlib.pyplot as plt
+from typing import Optional, Any, Tuple, List, Iterable, Dict, Union, Callable, Iterable, Literal
+import numpy as np
+from sklearn.metrics import PrecisionRecallDisplay, ConfusionMatrixDisplay
+import ipywidgets as widgets
+from collections import OrderedDict
+from IPython.display import clear_output, display
+from math import log, e
+import sklearn.model_selection as skms
 
 # If there's mutliple modes, how do we want to choose one? Used in _cleanColumn
 # options: 'random', 'first', 'last'
@@ -70,10 +44,10 @@ _timeTypes = ['datetimetz', 'timedelta', 'datetime']
 
 
 try:
-    from Cope import todo
+    # from Cope import todo
+    pass
 except ImportError:
     todo = lambda *a: print('TODO: ', *a)
-
 
 
 # I got tired of MinMaxScaler returning numpy arrays
@@ -97,7 +71,6 @@ def installLibs(libs=['pandas', 'numpy', 'imblearn', 'ipywidgets', 'seaborn', 's
         print('You dont seem to be calling from IPython. Simply run `pip install pandas altair numpy imblearn ipywidgets seaborn scipy matplotlib IPython` in a terminal')
 
 
-
 # I AM THE COMPUTER GOBLIN
 #       FEAR ME
 def addVerbose(func):
@@ -118,6 +91,7 @@ def _cleaning_func(**decorator_kwargs):
         Does NOT support input types of tuple/list of pd.DataFrames
     """
     trivial = lambda x: x
+
     def error(toType):
         def _error(x):
             raise TypeError(f"Cant cast {toType} to {type(x)}")
@@ -157,7 +131,7 @@ def _cleaning_func(**decorator_kwargs):
             # Runs when the decorated function gets called
             if isinstance(dat, (list, tuple)):
                 if len(dat) == 0:
-                    raise TypeError(f'Please dont pass in an empty list')
+                    raise TypeError('Please dont pass in an empty list')
                 elif len(dat) == 1:
                     dat = dat[0]
                 # If we're given a collection of pd.DataFrames, then iterate through the function and
@@ -230,12 +204,12 @@ def getOutliers(data, zscore=None):
         raise TypeError(f"Invalid type {type(data)} given")
 
 def normalizePercentage(p, error='Percentage is of the wrong type (int or float expected)'):
-    if isinstance(p, (int, Integer)):
+    if isinstance(p, int):
         return p / 100
-    elif isinstance(p, (float, Float)):
+    elif isinstance(p, float):
         return p
     elif isinstance(p, bool):
-        if p == True:
+        if p is True:
             return 1.
         else:
             return 0.
@@ -321,7 +295,7 @@ def percentCountPlot(data, feature, target=None, ax=None, title='Percentage of v
     # plt.title(f'Percentage of values used in {feature}')
     Y = data[feature]
     total = float(len(Y))
-    ax=sns.countplot(x=feature, data=data, hue=target, ax=ax)
+    ax = sns.countplot(x=feature, data=data, hue=target, ax=ax)
     ax.set_title(title.format(feature))
     for p in ax.patches:
         ax.annotate('{:.1f}%'.format(100*p.get_height()/total), (p.get_x()+0.1, p.get_height()+5))
@@ -432,14 +406,14 @@ def handle_missing(col, method:Union[pd.Series, 'remove', 'mean', 'median', 'mod
         return without
     elif method == 'mean':
         if isCatagorical(col):
-            raise TypeError(f"Cannot get mean of a catagorical feature")
+            raise TypeError("Cannot get mean of a catagorical feature")
         mean = without.mean()
         log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the mean ({mean:.2f})')
         # Copy it for consistency
         return col.copy().mask(col == missing_value, mean)
     elif method == 'median':
         if isCatagorical(col):
-            raise TypeError(f"Cannot get median of a catagorical feature")
+            raise TypeError("Cannot get median of a catagorical feature")
         median = without.median()
         log(f'Setting all samples with a "{col.name}" value of "{missing_value}" to the median ({median})')
         return col.copy().mask(col == missing_value, median)
@@ -487,13 +461,13 @@ def query(df:pd.DataFrame, column:str, query:str, method:Union[pd.Series, 'remov
         df = df.drop(df.query(query).index)
     elif method == 'mean':
         if isCatagorical(df[column]):
-            raise TypeError(f"Cannot get mean of a catagorical feature")
+            raise TypeError("Cannot get mean of a catagorical feature")
         mean = df[column].mean()
         log(f'Setting all samples where {query} is true to the mean of "{column}" ({mean:.2})')
         df.loc[df.query(query).index, column] = mean
     elif method == 'median':
         if isCatagorical(df[column]):
-            raise TypeError(f"Cannot get median of a catagorical feature")
+            raise TypeError("Cannot get median of a catagorical feature")
         median = df[column].median()
         log(f'Setting all samples where "{query}" is true to the median of "{column}" ({median})')
         df.loc[df.query(query).index, column] = median
@@ -561,7 +535,7 @@ def bin(col, method:Union['frequency', 'width', Tuple, List], amt=5, log=...):
 
 @_cleaning_func(df=pd.DataFrame)
 def rescale(df, return_scaler=False, log=...):
-    log(f'Rescaling')
+    log('Rescaling')
     # display(df)
     scaler = MinMaxScaler().fit(df)
     ans = pd.DataFrame(scaler.transform(df), columns=df.columns)
@@ -586,7 +560,7 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
             # raise TypeError(f"Series given is already quantatitive")
     # else:
     if (col is not None and isQuantatative(df[col])) or (col is None and isinstance(df, pd.Series) and isQuantatative(df)):
-        raise TypeError(f"Series given is already quantatitive")
+        raise TypeError("Series given is already quantatitive")
 
     if method == 'assign':
         log(f'Converting "{col}" to quantatative by assinging to arbitrary values', verbose)
@@ -616,7 +590,7 @@ def convert_numeric(df, col:str=None, method:Union['assign', 'one_hot_encode']='
         if isinstance(col, pd.Series):
             log(f'Converting "{df.name}" to quantatative by one hot encoding', verbose)
         else:
-            log(f'Converting DataFrame to quantatative by one hot encoding', verbose)
+            log('Converting DataFrame to quantatative by one hot encoding', verbose)
 
         return pd.get_dummies(df, columns=list(col))
     else:
@@ -664,7 +638,7 @@ def split(*data, amt=.2, method:Union['random', 'chunk', 'head', 'tail']='random
             rtn += [d.iloc[:split], d.iloc[split:]]
         return rtn
     else:
-        raise TypeError(f"Invalid method parameter given")
+        raise TypeError("Invalid method parameter given")
 
 # The main functions
 def explore(data,
@@ -680,7 +654,7 @@ def explore(data,
             starty=None,
             startHue=None,
             alpha=None,
-    ):
+            ):
     # Parse params and make sure all the params are valid
     assert not isinstance(target, (list, tuple)), 'There can only be 1 target feature'
     assert target is None or target in data.columns, f'Target {target} is not one of the features'
@@ -697,12 +671,10 @@ def explore(data,
         else:
             startFeature = data.columns[0]
 
-
     # Define variables
     whatTheHeck = (corr, missing)
     max_name_len = len(max(data.columns, key=len))
     ALPHA = min(1, 1000/len(data)) if alpha is None else alpha
-
 
     # Define widget[s]
     combobox = widgets.Dropdown(
@@ -740,21 +712,21 @@ def explore(data,
     featureBox.layout.visibility = 'hidden'
     featureABox = widgets.Dropdown(
         options=list(data.columns),
-                    value=startx if startx is not None else startFeature,
-                    description='x',
-        )
+        value=startx if startx is not None else startFeature,
+        description='x',
+    )
     featureABox.layout.visibility = 'hidden'
     featureBBox = widgets.Dropdown(
         options=list(data.columns),
-                    value=starty if starty is not None else startFeature,
-                    description='y',
-        )
+        value=starty if starty is not None else startFeature,
+        description='y',
+    )
     featureBBox.layout.visibility = 'hidden'
     featureHueBox = widgets.Dropdown(
         options=list(data.columns) + ['None'],
-                    value=startHue if startHue is not None else 'None',
-                    description='hue',
-        )
+        value=startHue if startHue is not None else 'None',
+        description='hue',
+    )
     featureHueBox.layout.visibility = 'hidden'
     outlierSlider = widgets.FloatSlider(
         value=3,
@@ -806,7 +778,7 @@ def explore(data,
 
                         print(key + ":")
                         joined_list = ", ".join(value)
-                        if len(joined_list) <= 80: # adjust this number as needed
+                        if len(joined_list) <= 80:  # adjust this number as needed
                             print('   ' + joined_list)
                         else:
                             for item in value:
@@ -925,7 +897,7 @@ def explore(data,
                     # Because dates are weird
                     try:
                         print(f'It has a kurtosis value of {scipy.stats.kurtosis(data[feature]):,.2f}.')
-                        print(f'\tNegative values mean less outliers than a normal distrobution, positive values mean more.')
+                        print('\tNegative values mean less outliers than a normal distrobution, positive values mean more.')
                     except np.core._exceptions.UFuncTypeError: pass
                     print(f'It has a minimum value of {data[feature].min():,.2f}, and a maximum value of {data[feature].max():,.2f}.')
                     print(correlations)
@@ -970,7 +942,7 @@ def explore(data,
                     # counts = data.groupby(a)[b].value_counts()
                     # print(counts.index.max())
                     # print(counts)
-                    graph.set(title=f'Most common together: Todo')
+                    graph.set(title='Most common together: Todo')
 
                 plt.show()
         elif page == 'Matrix':
@@ -1020,7 +992,7 @@ def explore(data,
 
                         lower = data[q].quantile(.25) - data[q].min()
                         lowerMid = data[q].median() - data[q].quantile(.25)
-                        if lower -  lowerMid > OUTLIER_THRESHOLD * data[q].median():
+                        if lower - lowerMid > OUTLIER_THRESHOLD * data[q].median():
                             print(f'Feature {q:>{max_name_len}} may have some lower outliers', end='   | ')
                             print(f'lower: {lower:>6.1f} | lowerMid: {lowerMid:>6.1f} | median: {data[q].median():>6.1f} | diff: {lower-lowerMid:>6.1f}')
                     except TypeError:
@@ -1049,9 +1021,9 @@ def _cleanColumn(df, args, column, verbose, ignoreWarnings=False):
     if column in df.columns or column is None:
         for op, options in args.items():
             # Quick parameter type checking for bools
-            if options == False and op not in ('missing_value', 'remove'):
+            if options is False and op not in ('missing_value', 'remove'):
                 continue
-            if options == True and not ignoreWarnings and op not in ('drop_duplicates', 'missing_value', 'remove', 'drop'):
+            if options is True and not ignoreWarnings and op not in ('drop_duplicates', 'missing_value', 'remove', 'drop'):
                 raise TypeError(f"'True' is an invalid option for {op} (for column {column})")
 
             if   op == 'drop_duplicates':
@@ -1127,7 +1099,7 @@ def clean(df:pd.DataFrame,
         config: Dict[str, Dict[str, Any]],
         verbose:bool=False,
         split:str=None,
-    ) -> pd.DataFrame:
+        ) -> pd.DataFrame:
     """ Returns a cleaned copy of the DataFrame passed to it
         NOTE: The order of the entries in the config dict determine the order they are performed
 
@@ -1229,7 +1201,7 @@ def resample(X, y, method:Union['oversample', 'undersample', 'mixed']='oversampl
     elif method == 'mixed':
         todo('figure out how to mix under and over sampling')
     else:
-        raise TypeError(f"Invalid method arguement given")
+        raise TypeError("Invalid method arguement given")
 
 # @_cleaning_func(test=pd.Series)
 @_cleaning_func(testPredictions=pd.Series)
@@ -1310,7 +1282,7 @@ def evaluateQuantitative(test, testPredictions, train=None, trainPredictions=Non
         # Interval(0.5, 1.0, closed='right'), Interval(0.05, 0.1, closed='right'), Interval(0.2, 0.5, closed='right'), Interval(0.0, 0.05, closed='right'), Interval(0.1, 0.2, closed='right')
 
         # print(testfinal['abspercentmiss'].describe(percentiles=[.1,.2,.3,.4,.5,.6,.7,.8,.9,.95]))
-        xlims=(0,1e3)
+        xlims = (0,1e3)
         # ylims=(0,1e3)
         ax = sns.scatterplot(data=testfinal,x='Ground Truth',y='Predictions',hue="percent_difference",palette=color_dict)
         # ax.set(xscale="log", yscale="log", xlim=xlims, ylim=ylims)
@@ -1326,7 +1298,6 @@ def evaluateCatagorical(test, testPredictions, train=None, trainPredictions=None
      """
     assert (train is None) == (trainPredictions is None), 'You have to pass both train & trainPredictions'
 
-
     def _score(name, func, explaination, _test=True, **kwargs):
         name += ':'
         if compact:
@@ -1335,7 +1306,6 @@ def evaluateCatagorical(test, testPredictions, train=None, trainPredictions=None
             print(f'\t{name:<23} {func(test, testPredictions, **kwargs) if _test else func(train, trainPredictions, **kwargs):,.{accuracy}f}')
             if explain:
                 print('\t\t' + explaination)
-
 
     def _catagorical(_test=True):
         # Can't do an F1 score with more than 2 classes
@@ -1428,7 +1398,6 @@ def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=No
             print('\nTrain:')
             _catagorical(False)
 
-
         if confusion:
             ConfusionMatrixDisplay.from_predictions(train, trainPredictions, cmap='Blues')
             plt.show()
@@ -1448,12 +1417,12 @@ def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=No
             color_dict = dict({'below 20%':'tab:blue',
                                 'above 20%': 'tab:orange'})
 
-            shower = pd.DataFrame(student_ds, columns = ['predictions'])
+            shower = pd.DataFrame(student_ds, columns=['predictions'])
             shower.columns = ['predictions']
             testfinal = pd.concat([shower,targets['actual']],axis=1)
             testfinal['difference'] = testfinal['actual']-testfinal['predictions']
             testfinal['percent_difference'] = abs(testfinal['difference']/testfinal['actual'])
-            testfinal['percent_bucket'] = [ "above 20%" if i >= 0.2 else "below 20%" for i in testfinal.percent_difference ]
+            testfinal['percent_bucket'] = ["above 20%" if i >= 0.2 else "below 20%" for i in testfinal.percent_difference]
 
             # print(testfinal['abspercentmiss'].describe(percentiles=[.1,.2,.3,.4,.5,.6,.7,.8,.9,.95]))
             # xlims=(0,1e3)
@@ -1464,9 +1433,8 @@ def evaluate(catagorical, test, testPredictions, train=None, trainPredictions=No
             ax.plot(color='r')
             # plt.legend(labels=['perfect',"below 5",'above 5','10-20%','above 20'])
             plt.show()
-            print(f"-"*77)
+            print("-"*77)
             print("\n"*3)
-
 
 
 """
@@ -1497,7 +1465,6 @@ def importances(tree, names=None, rtn=False, graph=True, best=.01):
     if best:
         # df = df.assign(best=df.importance > best)
         df = df.loc[df.importance >= best]
-
 
     df = df.sort_values(by='importance', ascending=False, axis=0)
     if graph:

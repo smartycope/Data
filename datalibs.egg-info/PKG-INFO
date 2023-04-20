@@ -1,0 +1,54 @@
+Metadata-Version: 2.1
+Name: datalibs
+Version: 1.1.1
+Summary: A bunch of functions useful for data science (mostly wrappers around other libraries)
+Home-page: https://github.com/smartycope/Data
+Author: Copeland Carter
+Author-email: smartycope@gmail.com
+Maintainer: Copeland Carter
+Maintainer-email: smartycope@gmail.com
+License: MIT/Apache-2.0
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+License-File: LICENSE
+License-File: LICENSE-APACHE
+License-File: LICENSE-MIT
+
+# datalibs
+
+-----
+
+**Table of Contents**
+
+* [Installation](#installation)
+* [License](#license)
+
+## Installation
+
+datalibs is distributed on [PyPI](https://pypi.org) as a universal
+wheel and is available on Linux/macOS and Windows and supports
+Python 3.10+ and PyPy.
+
+```bash
+$ pip install datalibs
+```
+
+## License
+
+datalibs is distributed under the terms of both
+
+- [MIT License](https://choosealicense.com/licenses/mit)
+- [Apache License, Version 2.0](https://choosealicense.com/licenses/apache-2.0)
+
+at your option.
